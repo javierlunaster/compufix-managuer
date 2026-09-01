@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Ver DESIGN.md para la justificación de cada valor */
+  --bg: #10171a;
+  --surface: #17201f;
+  --surface-raised: #1d2827;
+  --border: #2a3634;
+  --text: #ece6da;
+  --text-muted: #93a29c;
+  --accent: #c2884d;
+  --accent-strong: #e3a868;
+  --success: #4ade80;
+  --warning: #f5b944;
+  --info: #5fa8d3;
+  --danger: #e5484d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Números tabulares por defecto en cualquier elemento con clase .tabular —
+   usado en códigos de orden, mediciones y montos, para que las columnas de
+   dígitos queden alineadas como en un instrumento real. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foco visible consistente en todo el sistema (accesibilidad) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: var(--bg);
+}
+
+/* Scrollbar discreta, coherente con el resto de la interfaz oscura */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

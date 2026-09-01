@@ -1,0 +1,92 @@
+# Despliegue en un servidor real. Difiere de docker-compose.yml (el de
+# desarrollo local, Fase 1) en que el backend y el frontend TAMBIÉN corren
+# en contenedores propios — en desarrollo, esos dos corren directo en la
+# máquina con `npm run start:dev` / `npm run dev` para tener recarga en
+# caliente; en producción no hace falta eso, así que se empaquetan.
+#
+# Uso:
+#   cp .env.prod.example .env.prod   (y completa los valores reales)
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Deja Adminer FUERA a propósito: es una herramienta de administración de
+# base de datos sin autenticación propia — perfecta para desarrollo local,
+# pero no algo que deba quedar expuesto en un servidor de producción.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - compufix_pg_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sin "ports:" — Postgres no se expone fuera de la red interna de
+    # Docker; solo el backend le habla, directo por el nombre del servicio.
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
+      NODE_ENV: production
+      PORT: 3000
+    volumes:
+      # Persiste las fotos subidas (Fase 15) fuera del contenedor — sin
+      # esto, reconstruir la imagen (docker compose up --build) borraría
+      # todas las fotos ya subidas por el taller.
+      - compufix_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Sin "ports:" — ya no se expone directo a internet. Solo Caddy (abajo)
+    # tiene los puertos 80/443 publicados; le habla al backend por la red
+    # interna de Docker, igual que ya le hablaba Postgres.
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # Tampoco expone puertos directo — Caddy es el único punto de entrada.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - compufix_caddy_data:/data
+      - compufix_caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  compufix_pg_data_prod:
+  compufix_uploads:
+  compufix_caddy_data:
+  compufix_caddy_config:

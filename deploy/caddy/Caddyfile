@@ -1,0 +1,30 @@
+# Caddy obtiene y renueva el certificado TLS automáticamente (Let's
+# Encrypt) para el dominio configurado — sin certbot, sin cron jobs, sin
+# renovación manual. Solo necesita que el DNS del dominio ya apunte a la
+# IP de este servidor y que los puertos 80/443 estén abiertos.
+#
+# Variables esperadas en el .env.prod (ver .env.prod.example):
+#   DOMAIN=taller.midominio.com
+#   ADMIN_EMAIL=tu-correo@ejemplo.com   (Let's Encrypt lo usa para avisos)
+
+{
+	email {$ADMIN_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# Las fotos de evidencia (Fase 15) las sirve el backend directamente
+	# en /uploads — deben ir al mismo contenedor que la API, no al frontend.
+	handle /uploads/* {
+		reverse_proxy backend:3000
+	}
+
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

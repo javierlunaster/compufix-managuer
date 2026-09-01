@@ -1,0 +1,69 @@
+# docker-compose para la INSTALACIÓN DE ESCRITORIO (una sola máquina
+# Windows del taller) — distinto de docker-compose.prod.yml (pensado para
+# un servidor real con dominio propio) y de docker-compose.yml (desarrollo
+# local del proyecto). Aquí no hay dominio ni HTTPS: todo se accede por
+# http://localhost desde el mismo computador.
+#
+# La única razón por la que esto funciona sin instalar Node.js ni
+# PostgreSQL en Windows es que Docker Desktop construye y corre ambos
+# servicios dentro de contenedores Linux (vía WSL2) — el único requisito
+# real en la máquina del taller es tener Docker Desktop instalado.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: compufix
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: compufix
+    volumes:
+      - compufix_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compufix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://compufix:${DB_PASSWORD}@postgres:5432/compufix?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 8h
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # No hay dominio real — el propio localhost del computador del
+      # taller es "el frontend", así que se permite ese origen exacto.
+      FRONTEND_URL: http://localhost:8080
+      NODE_ENV: production
+      PORT: 3000
+    volumes:
+      - compufix_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Se hornea en el build de la imagen: como todo corre en el mismo
+        # computador, la URL absoluta del backend siempre es esta misma.
+        VITE_API_URL: http://localhost:3000/api
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  compufix_pg_data:
+  compufix_uploads:
