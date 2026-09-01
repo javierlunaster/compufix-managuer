@@ -1,16 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { StorageService } from "../storage/storage.service";
 import { UploadAttachmentDto } from "./dto/upload-attachment.dto";
-import { UPLOADS_DIR } from "./multer.config";
-import * as fs from "fs";
-import * as path from "path";
 
 @Injectable()
 export class AttachmentsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private storage: StorageService,
   ) {}
 
   private async ensureOrderExists(orderId: number) {
@@ -68,14 +67,21 @@ export class AttachmentsService {
       throw new BadRequestException("Sube al menos una foto");
     }
 
+    // Se sube primero a Supabase Storage (fuera de la transacción de base
+    // de datos — no tiene sentido revertir una subida ya hecha) y solo si
+    // eso funciona se insertan los registros en la base de datos.
+    const uploaded = await Promise.all(
+      files.map((file) => this.storage.upload(file, `repair-orders/${ids.repairOrderId}`)),
+    );
+
     const created = await this.prisma.$transaction(
-      files.map((file) =>
+      files.map((file, i) =>
         this.prisma.attachment.create({
           data: {
             repairOrderId: ids.repairOrderId,
             repairLogId: ids.repairLogId,
             diagnosticId: ids.diagnosticId,
-            fileUrl: `/uploads/${file.filename}`,
+            fileUrl: uploaded[i].publicUrl,
             fileType: file.mimetype,
             category: dto.category,
             description: dto.description,
@@ -133,7 +139,7 @@ export class AttachmentsService {
    * Borrado físico del archivo Y del registro — a diferencia de casi todo
    * el resto del sistema, una foto subida por error (desenfocada, del
    * equipo equivocado) no tiene valor histórico que preservar. Se elimina
-   * también el archivo en disco para no dejar basura acumulándose.
+   * también el archivo en Supabase Storage para no dejar basura acumulándose.
    */
   async remove(attachmentId: number, actingUserId: number) {
     const attachment = await this.prisma.attachment.findUnique({ where: { id: attachmentId } });
@@ -143,12 +149,10 @@ export class AttachmentsService {
 
     await this.prisma.attachment.delete({ where: { id: attachmentId } });
 
-    const filePath = path.join(UPLOADS_DIR, path.basename(attachment.fileUrl));
-    fs.unlink(filePath, () => {
-      // Si el archivo ya no existe en disco por algún motivo, no hay nada
-      // más que hacer — el registro en base de datos ya se borró, que es
-      // lo que importa para que deje de aparecer en la interfaz.
-    });
+    // Si el archivo ya no existe en Storage por algún motivo, Supabase no
+    // lanza error — el registro en base de datos ya se borró, que es lo
+    // que importa para que deje de aparecer en la interfaz.
+    await this.storage.remove(this.storage.pathFromPublicUrl(attachment.fileUrl));
 
     await this.audit.log({
       userId: actingUserId,

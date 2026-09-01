@@ -1,0 +1,32 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+build/
+coverage/
+
+# Variables de entorno reales (los .env.example SÍ se versionan)
+.env
+.env.prod
+.env.local
+.env.*.local
+
+# Archivos subidos localmente (en producción viven en Supabase Storage)
+backend/uploads/
+
+# Exports de migración de datos (contienen datos reales del negocio)
+deploy/migration-export/
+backups/
+
+# Vite / cache local
+frontend/node_modules/.vite/
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
+
+# Editor / SO
+.vscode/
+.idea/
+*.log
+.DS_Store

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, ApiError, API_ORIGIN } from "@/lib/api";
+import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import type { Attachment } from "@/lib/types";
 import { Button, ErrorBanner } from "@/components/ui";
 
@@ -61,9 +61,9 @@ export function PhotoGallery({
         <div className="flex flex-wrap gap-2">
           {photos.map((p) => (
             <div key={p.id} className="group relative">
-              <a href={`${API_ORIGIN}${p.fileUrl}`} target="_blank" rel="noreferrer">
+              <a href={resolvePhotoUrl(p.fileUrl)} target="_blank" rel="noreferrer">
                 <img
-                  src={`${API_ORIGIN}${p.fileUrl}`}
+                  src={resolvePhotoUrl(p.fileUrl)}
                   alt={p.description ?? "Evidencia fotográfica"}
                   className={`${thumbSize} rounded border border-border object-cover`}
                 />

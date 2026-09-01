@@ -38,14 +38,15 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-attachments}
       FRONTEND_URL: ${FRONTEND_URL}
       NODE_ENV: production
       PORT: 3000
-    volumes:
-      # Persiste las fotos subidas (Fase 15) fuera del contenedor — sin
-      # esto, reconstruir la imagen (docker compose up --build) borraría
-      # todas las fotos ya subidas por el taller.
-      - compufix_uploads:/app/uploads
+    # Las fotos subidas (Fase 15) ya no viven en un volumen local — se
+    # suben a Supabase Storage (ver backend/src/storage), así que
+    # reconstruir la imagen ya no pone en riesgo las fotos ya subidas.
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,6 +88,5 @@ services:
 
 volumes:
   compufix_pg_data_prod:
-  compufix_uploads:
   compufix_caddy_data:
   compufix_caddy_config:

@@ -30,16 +30,9 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
 
 echo "Respaldo completado: $BACKUP_FILE"
 
-# Las fotos subidas (Fase 15) viven en un volumen de Docker aparte —
-# pg_dump nunca las toca. Sin este paso, un respaldo "completo" en
-# realidad perdía toda la evidencia fotográfica de las órdenes.
-UPLOADS_BACKUP_FILE="$BACKUP_DIR/compufix-uploads-$TIMESTAMP.tar.gz"
-echo "Generando respaldo de fotos subidas en $UPLOADS_BACKUP_FILE ..."
-docker run --rm \
-  -v compufix-manager_compufix_uploads:/uploads:ro \
-  -v "$BACKUP_DIR":/backup \
-  alpine tar czf "/backup/compufix-uploads-$TIMESTAMP.tar.gz" -C /uploads .
-echo "Respaldo de fotos completado: $UPLOADS_BACKUP_FILE"
+# Las fotos subidas (Fase 15) ya no viven en un volumen de Docker: están en
+# Supabase Storage, que tiene sus propios backups gestionados por Supabase
+# (Project Settings → Backups). No hace falta respaldarlas aquí aparte.
 
 # Retención: se conservan los últimos 30 respaldos, se borran los más
 # viejos — sin esto, la carpeta de respaldos crecería indefinidamente.

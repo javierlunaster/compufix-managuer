@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { portalApi, PortalApiError, API_ORIGIN } from "@/lib/portalApi";
+import { portalApi, PortalApiError, resolvePhotoUrl } from "@/lib/portalApi";
 import type { PortalOrderDetail } from "@/lib/types";
 import { WARRANTY_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
@@ -98,9 +98,9 @@ export function PortalOrderDetailPage() {
           <CardHeader title="Fotos del equipo" />
           <div className="flex flex-wrap gap-2 p-4">
             {order.photos.map((p) => (
-              <a key={p.id} href={`${API_ORIGIN}${p.fileUrl}`} target="_blank" rel="noreferrer">
+              <a key={p.id} href={resolvePhotoUrl(p.fileUrl)} target="_blank" rel="noreferrer">
                 <img
-                  src={`${API_ORIGIN}${p.fileUrl}`}
+                  src={resolvePhotoUrl(p.fileUrl)}
                   alt="Evidencia del equipo"
                   className="h-20 w-20 rounded border border-border object-cover"
                 />

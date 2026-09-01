@@ -1,5 +1,9 @@
 # COMPufix Manager — Fase 1: Arquitectura + Modelo de Datos
 
+> **¿Vas a desplegar en internet (Railway + Supabase)?** Ve directo a
+> [`DEPLOY_RAILWAY_SUPABASE.md`](./DEPLOY_RAILWAY_SUPABASE.md). Lo de
+> abajo es la guía de desarrollo local, fase por fase.
+
 Esta fase entrega el **modelo de datos definitivo** (`backend/prisma/schema.prisma`), la infraestructura local para correrlo, y catálogos iniciales cargados desde los hallazgos del Excel. No incluye todavía API ni interfaz — eso empieza en la Fase 2 (autenticación) y Fase 3 (clientes + equipos), como se acordó en el plan de 14 fases.
 
 ## Qué se construyó en esta fase

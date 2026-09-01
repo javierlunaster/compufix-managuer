@@ -1,4 +1,4 @@
-import { API_ORIGIN } from "@/lib/api";
+import { API_ORIGIN, resolvePhotoUrl } from "@/lib/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
@@ -62,7 +62,7 @@ async function portalRequest<T>(
   return payload as T;
 }
 
-export { API_ORIGIN };
+export { API_ORIGIN, resolvePhotoUrl };
 
 export const portalApi = {
   get: <T>(path: string) => portalRequest<T>(path, { method: "GET" }),

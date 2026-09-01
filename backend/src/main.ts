@@ -2,7 +2,6 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
-import { join } from "path";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { validateEnv } from "./common/config/validate-env";
@@ -15,18 +14,12 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // crossOriginResourcePolicy en "cross-origin": por defecto, Helmet
-  // bloquea que un origen distinto (el frontend en :5173) cargue recursos
-  // de este servidor (:3000) como <img src="...">. Sin este ajuste, las
-  // fotos de evidencia (Fase 15) se subirían bien pero nunca se verían en
-  // la interfaz — el navegador las rechazaría en silencio por política de
-  // origen cruzado, no por un error de la aplicación.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-
-  // Sirve las fotos subidas (ver attachments/multer.config.ts) en
-  // /uploads/<archivo> — nótese que NO lleva el prefijo /api: setGlobalPrefix
-  // solo afecta a los controladores, no a los archivos estáticos.
-  app.useStaticAssets(join(process.cwd(), "uploads"), { prefix: "/uploads" });
+  // Las fotos de evidencia (Fase 15) ya no se sirven desde este servidor:
+  // viven en Supabase Storage (ver storage/storage.service.ts) y el
+  // frontend las carga directo desde ahí, así que no hace falta
+  // useStaticAssets ni el ajuste de crossOriginResourcePolicy que eso
+  // requería.
+  app.use(helmet());
 
   // En desarrollo, sin FRONTEND_URL definida, se permite cualquier origen
   // (más simple para trabajar en local). En producción, restringido

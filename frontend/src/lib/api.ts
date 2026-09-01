@@ -1,10 +1,19 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
-// Las fotos se sirven en /uploads/<archivo> (sin el prefijo /api — ver
-// main.ts del backend, useStaticAssets no respeta setGlobalPrefix). Se
-// deriva de API_BASE_URL quitando el "/api" final, para no tener que
-// mantener una segunda variable de entorno solo para esto.
+// Se mantiene por compatibilidad con datos antiguos (ver resolvePhotoUrl
+// más abajo) — ya no se usa para fotos nuevas, que ahora se suben a
+// Supabase Storage con URL absoluta propia.
 export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+/**
+ * `Attachment.fileUrl` ahora guarda una URL absoluta de Supabase Storage
+ * (ver backend/src/storage). Se mantiene el fallback a API_ORIGIN por si
+ * quedan registros antiguos con la ruta relativa "/uploads/..." de antes
+ * de la migración a Railway + Supabase.
+ */
+export function resolvePhotoUrl(fileUrl: string): string {
+  return /^https?:\/\//.test(fileUrl) ? fileUrl : `${API_ORIGIN}${fileUrl}`;
+}
 
 const TOKEN_KEY = "compufix_token";
 

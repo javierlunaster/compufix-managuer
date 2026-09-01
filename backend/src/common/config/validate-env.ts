@@ -1,4 +1,10 @@
-const REQUIRED_VARS = ["DATABASE_URL", "JWT_SECRET", "ENCRYPTION_KEY"] as const;
+const REQUIRED_VARS = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "ENCRYPTION_KEY",
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+] as const;
 
 // Los valores de ejemplo que trae .env.example — si alguien copia el
 // archivo y se le olvida cambiarlos, el sistema arrancaría "funcionando"
