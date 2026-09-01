@@ -1,11 +1,15 @@
 # --- Etapa 1: dependencias + build -----------------------------------
-FROM node:20-alpine AS builder
+# node:20-slim (Debian) en vez de node:20-alpine: los binarios del motor
+# de Prisma se compilan contra glibc + una versión específica de OpenSSL,
+# y en Alpine (musl) el desajuste de versión de OpenSSL entre lo que
+# detecta "prisma generate" y lo que trae la imagen final es una fuente
+# de fallos recurrente ("Please manually install OpenSSL..." aunque
+# OpenSSL sí esté instalado). Debian slim evita todo ese problema.
+FROM node:20-slim AS builder
 WORKDIR /app
 
-# El motor de Prisma necesita OpenSSL para conectarse a la base de datos —
-# node:20-alpine no lo trae por defecto. Sin esto, "prisma generate" y
-# "prisma migrate deploy" fallan con "Please manually install OpenSSL".
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci
@@ -18,14 +22,12 @@ COPY src ./src
 RUN npm run build
 
 # --- Etapa 2: imagen final, solo lo necesario para correr --------------
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Mismo motivo que en la etapa builder: el binario del motor de Prisma
-# copiado desde ahí (node_modules/.prisma) necesita OpenSSL en tiempo de
-# ejecución, no solo al generarse.
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci --omit=dev
