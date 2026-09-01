@@ -40,4 +40,7 @@ EXPOSE 3000
 
 # Aplica cualquier migración pendiente y luego arranca — así un despliegue
 # nuevo nunca corre con un esquema desactualizado por accidente.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# El compilado queda en dist/src/main.js (no dist/main.js): tsconfig.json
+# tiene rootDir "." porque también incluye prisma/**/*.ts, así que
+# TypeScript preserva la carpeta "src" bajo outDir.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
