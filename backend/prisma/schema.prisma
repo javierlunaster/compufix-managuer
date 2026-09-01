@@ -15,6 +15,14 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Se fija explícitamente en vez de dejar que Prisma autodetecte la
+  // versión de OpenSSL del contenedor — esa detección venía fallando en
+  // Railway (avisaba "failed to detect... Defaulting to openssl-1.1.x")
+  // aunque la imagen (Debian 12 / node:20-slim) trae OpenSSL 3.x, y el
+  // motor descargado para la versión equivocada no arranca. "native" se
+  // mantiene para que `prisma generate` en desarrollo local siga
+  // funcionando igual en cualquier sistema operativo.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
