@@ -2,6 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# El motor de Prisma necesita OpenSSL para conectarse a la base de datos —
+# node:20-alpine no lo trae por defecto. Sin esto, "prisma generate" y
+# "prisma migrate deploy" fallan con "Please manually install OpenSSL".
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 RUN npm ci
 
@@ -16,6 +21,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Mismo motivo que en la etapa builder: el binario del motor de Prisma
+# copiado desde ahí (node_modules/.prisma) necesita OpenSSL en tiempo de
+# ejecución, no solo al generarse.
+RUN apk add --no-cache openssl
 
 COPY package*.json ./
 RUN npm ci --omit=dev
