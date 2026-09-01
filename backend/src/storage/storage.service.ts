@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, OnModuleInit } from "@nestjs/common";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { StorageClient } from "@supabase/storage-js";
 import { randomUUID } from "crypto";
 import { extname } from "path";
 
@@ -10,13 +10,20 @@ import { extname } from "path";
  * Volume. Con Supabase Storage las fotos sobreviven a cualquier redeploy y
  * quedan cubiertas por los backups automáticos de Supabase.
  *
+ * Usa el paquete liviano @supabase/storage-js en vez del cliente completo
+ * @supabase/supabase-js a propósito: ese último inicializa también su
+ * cliente de Realtime (websockets) al crearse, que en Node 20 revienta el
+ * proceso con "Node.js detected but native WebSocket not found" (requiere
+ * Node 22+) — algo que nunca necesitamos, ya que este servicio solo sube y
+ * borra archivos.
+ *
  * Es el único archivo que sabe hablarle a Supabase Storage — attachments/
  * solo conoce esta interfaz (upload/remove), tal como se planteó desde la
  * arquitectura original ("capa abstraída para migrar a S3-compatible").
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
-  private client: SupabaseClient;
+  private client: StorageClient;
   private bucket: string;
 
   onModuleInit() {
@@ -34,8 +41,9 @@ export class StorageService implements OnModuleInit {
     // cualquier usuario autenticado ya validado por JwtAuthGuard — la
     // autorización real ya ocurrió antes de llegar aquí, así que no hace
     // falta (ni conviene) usar la anon key con políticas RLS por archivo.
-    this.client = createClient(url, serviceRoleKey, {
-      auth: { persistSession: false },
+    this.client = new StorageClient(`${url}/storage/v1`, {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
     });
   }
 
@@ -48,7 +56,7 @@ export class StorageService implements OnModuleInit {
   async upload(file: Express.Multer.File, folder: string): Promise<{ path: string; publicUrl: string }> {
     const path = `${folder}/${randomUUID()}${extname(file.originalname)}`;
 
-    const { error } = await this.client.storage.from(this.bucket).upload(path, file.buffer, {
+    const { error } = await this.client.from(this.bucket).upload(path, file.buffer, {
       contentType: file.mimetype,
       upsert: false,
     });
@@ -57,7 +65,7 @@ export class StorageService implements OnModuleInit {
       throw new InternalServerErrorException(`No se pudo subir el archivo a Supabase Storage: ${error.message}`);
     }
 
-    const { data } = this.client.storage.from(this.bucket).getPublicUrl(path);
+    const { data } = this.client.from(this.bucket).getPublicUrl(path);
     return { path, publicUrl: data.publicUrl };
   }
 
@@ -67,7 +75,7 @@ export class StorageService implements OnModuleInit {
    * el borrado en disco local (fs.unlink con callback vacío).
    */
   async remove(path: string): Promise<void> {
-    await this.client.storage.from(this.bucket).remove([path]);
+    await this.client.from(this.bucket).remove([path]);
   }
 
   /**

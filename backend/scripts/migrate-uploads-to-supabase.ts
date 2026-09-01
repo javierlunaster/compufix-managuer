@@ -22,7 +22,7 @@
  * empiezan con "https://", se saltan).
  */
 import { PrismaClient } from "@prisma/client";
-import { createClient } from "@supabase/supabase-js";
+import { StorageClient } from "@supabase/storage-js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -46,7 +46,10 @@ async function main() {
   }
 
   const prisma = new PrismaClient();
-  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  const storage = new StorageClient(`${supabaseUrl}/storage/v1`, {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+  });
 
   const pending = await prisma.attachment.findMany({
     where: { fileUrl: { startsWith: "/uploads/" } },
@@ -70,7 +73,7 @@ async function main() {
     const buffer = fs.readFileSync(localPath);
     const storagePath = `repair-orders/${attachment.repairOrderId ?? "sin-orden"}/${filename}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await storage
       .from(bucket)
       .upload(storagePath, buffer, { contentType: attachment.fileType, upsert: true });
 
@@ -79,7 +82,7 @@ async function main() {
       continue;
     }
 
-    const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+    const { data } = storage.from(bucket).getPublicUrl(storagePath);
 
     await prisma.attachment.update({
       where: { id: attachment.id },
