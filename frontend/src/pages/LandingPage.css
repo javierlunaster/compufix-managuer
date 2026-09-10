@@ -109,6 +109,24 @@
   color: var(--accent-strong);
 }
 
+/* Acceso discreto al login del personal — antes "/" redirigía ahí solo,
+   ahora "/" es esta página pública, así que necesita un enlace visible. */
+.landing-page .staff-link {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+.landing-page .staff-link:hover {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
 .landing-page .btn {
   display: inline-flex;
   align-items: center;

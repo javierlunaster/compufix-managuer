@@ -34,6 +34,9 @@ export function LandingPage() {
             <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
               WhatsApp
             </a>
+            <Link className="staff-link" to="/login">
+              Personal
+            </Link>
           </div>
         </div>
       </header>
