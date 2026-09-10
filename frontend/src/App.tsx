@@ -33,6 +33,7 @@ import { UsersPage } from "@/pages/UsersPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
+import { LandingPage } from "@/pages/LandingPage";
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,6 +52,26 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           mostrando el mensaje de error al volver a intentar desde el menú. */}
       <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
     </Layout>
+  );
+}
+
+// "/" hace doble función: sin sesión, es la página pública de presentación
+// del negocio (LandingPage); con sesión activa, sigue siendo el Dashboard
+// de siempre. Así un visitante nuevo entiende qué hace el taller antes de
+// pedirle que inicie sesión, sin tocar el comportamiento para el personal.
+function HomeGate() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center bg-bg" />;
+  }
+  if (!user) {
+    return <LandingPage />;
+  }
+  return (
+    <ProtectedLayout>
+      <DashboardPage />
+    </ProtectedLayout>
   );
 }
 
@@ -79,7 +100,7 @@ function AppRoutes() {
         }
       />
 
-      <Route path="/" element={<ProtectedLayout><DashboardPage /></ProtectedLayout>} />
+      <Route path="/" element={<HomeGate />} />
       <Route path="/customers" element={<ProtectedLayout><CustomersPage /></ProtectedLayout>} />
       <Route path="/customers/:id" element={<ProtectedLayout><CustomerDetailPage /></ProtectedLayout>} />
       <Route path="/repair-orders" element={<ProtectedLayout><RepairOrdersPage /></ProtectedLayout>} />
