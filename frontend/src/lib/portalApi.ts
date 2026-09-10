@@ -31,7 +31,7 @@ export class PortalApiError extends Error {
 
 async function portalRequest<T>(
   path: string,
-  options: { method?: "GET" | "POST"; body?: unknown } = {},
+  options: { method?: "GET" | "POST" | "PATCH"; body?: unknown } = {},
 ): Promise<T> {
   const { method = "GET", body } = options;
   const token = getPortalToken();
@@ -67,4 +67,5 @@ export { API_ORIGIN, resolvePhotoUrl };
 export const portalApi = {
   get: <T>(path: string) => portalRequest<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown) => portalRequest<T>(path, { method: "POST", body }),
+  patch: <T>(path: string, body?: unknown) => portalRequest<T>(path, { method: "PATCH", body }),
 };

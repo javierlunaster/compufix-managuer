@@ -528,6 +528,30 @@ export type PortalOrderSummary = {
   };
 };
 
+export type PortalQuotationItem = {
+  id: number;
+  type: QuotationItemType;
+  description: string;
+  quantity: number;
+  unitPrice: string;
+  subtotal: string;
+};
+
+export type PortalQuotation = {
+  id: number;
+  quotationNumber: string;
+  date: string;
+  status: QuotationStatus;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  shipping: string;
+  total: string;
+  validUntil?: string | null;
+  notes?: string | null;
+  items: PortalQuotationItem[];
+};
+
 export type PortalOrderDetail = PortalOrderSummary & {
   reportedIssue: string;
   physicalCondition?: string | null;
@@ -544,4 +568,5 @@ export type PortalOrderDetail = PortalOrderSummary & {
     warrantyEndDate: string;
     status: WarrantyStatus;
   }[];
+  quotations: PortalQuotation[];
 };

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { QuotationStatus } from "@prisma/client";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { CustomerPortalLoginDto } from "./dto/customer-portal-login.dto";
@@ -107,9 +113,40 @@ export class CustomerPortalService {
           select: { id: true, coverageDescription: true, warrantyEndDate: true, status: true },
           orderBy: { deliveryDate: "desc" },
         },
+        // Cotizaciones nacidas de ESTA orden (sourceOrderId) — el cliente
+        // necesita verlas para poder aprobar/rechazar. Se seleccionan
+        // precio y descripción de cada ítem (lo que ya se le cotizó), pero
+        // nunca el costo/margen interno del taller (eso no vive en
+        // CustomerQuotation, vive en Product.cost, y no se toca aquí).
+        quotations: {
+          select: {
+            id: true,
+            quotationNumber: true,
+            date: true,
+            status: true,
+            subtotal: true,
+            discount: true,
+            tax: true,
+            shipping: true,
+            total: true,
+            validUntil: true,
+            notes: true,
+            items: {
+              select: {
+                id: true,
+                type: true,
+                description: true,
+                quantity: true,
+                unitPrice: true,
+                subtotal: true,
+              },
+            },
+          },
+          orderBy: { date: "desc" },
+        },
         // NUNCA se seleccionan: devicePasswordEncrypted, notes (notas
         // internas del técnico), logs/diagnostics (bitácora técnica
-        // interna), cotizaciones, ni ningún dato de costo/margen.
+        // interna), ni ningún dato de costo/margen.
       },
     });
 
@@ -123,5 +160,42 @@ export class CustomerPortalService {
 
     const { customerId: _omit, ...safeOrder } = order;
     return safeOrder;
+  }
+
+  /**
+   * El cliente aprueba o rechaza una cotización propia. Solo se permite
+   * desde SENT/PENDING (una cotización enviada esperando respuesta) — no
+   * desde DRAFT (el taller todavía la está armando, no debería ser
+   * visible como "lista para responder" de todos modos porque no se
+   * filtra por estado al listarla, pero igual queda bloqueada aquí como
+   * segunda barrera) ni desde un estado ya resuelto (APPROVED, REJECTED,
+   * EXPIRED, CONVERTED).
+   *
+   * No pasa por AuditService: esa auditoría exige un userId de la tabla
+   * User (personal del taller), y quien actúa aquí es un cliente, no un
+   * usuario del sistema — no hay una fila de User a la que atribuírselo.
+   */
+  async respondToQuotation(customerId: number, quotationId: number, approve: boolean) {
+    const quotation = await this.prisma.customerQuotation.findUnique({
+      where: { id: quotationId },
+    });
+    if (!quotation || quotation.customerId !== customerId) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (
+      quotation.status !== QuotationStatus.SENT &&
+      quotation.status !== QuotationStatus.PENDING
+    ) {
+      throw new BadRequestException(
+        "Esta cotización ya no está pendiente de respuesta.",
+      );
+    }
+
+    await this.prisma.customerQuotation.update({
+      where: { id: quotationId },
+      data: { status: approve ? QuotationStatus.APPROVED : QuotationStatus.REJECTED },
+    });
+
+    return { id: quotationId, status: approve ? QuotationStatus.APPROVED : QuotationStatus.REJECTED };
   }
 }

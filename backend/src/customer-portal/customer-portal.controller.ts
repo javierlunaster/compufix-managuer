@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Body, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseIntPipe, Patch, Post, Body, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { Public } from "../common/decorators/public.decorator";
 import { CustomerPortalService } from "./customer-portal.service";
@@ -42,5 +42,23 @@ export class CustomerPortalController {
     @Param("id", ParseIntPipe) orderId: number,
   ) {
     return this.customerPortalService.findMyOrderDetail(customer.id, orderId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Patch("quotations/:id/approve")
+  approveQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.respondToQuotation(customer.id, quotationId, true);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Patch("quotations/:id/reject")
+  rejectQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.respondToQuotation(customer.id, quotationId, false);
   }
 }
