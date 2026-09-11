@@ -29,7 +29,10 @@ const ORDER_DETAIL_INCLUDE = {
   },
   procedures: { orderBy: { performedAt: "desc" as const } },
   diagnostics: {
-    orderBy: { createdAt: "desc" as const },
+    // Orden cronológico (más antiguo primero) — igual que logs más abajo:
+    // el informe técnico y la pestaña Diagnóstico deben leerse como una
+    // secuencia de lo que pasó, no con el último hallazgo arriba.
+    orderBy: { createdAt: "asc" as const },
     include: {
       measurements: true,
       technician: { select: { id: true, fullName: true } },

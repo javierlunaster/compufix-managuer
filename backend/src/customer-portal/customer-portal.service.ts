@@ -132,7 +132,9 @@ export class CustomerPortalService {
               orderBy: { uploadedAt: "asc" },
             },
           },
-          orderBy: { createdAt: "desc" },
+          // Más antiguo primero — igual que logs más abajo: se lee como
+          // una secuencia de lo que fue pasando, no con lo último arriba.
+          orderBy: { createdAt: "asc" },
         },
         logs: {
           select: {

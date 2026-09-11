@@ -67,7 +67,7 @@ export class DiagnosticsService {
         technician: { select: { id: true, fullName: true } },
         photos: { orderBy: { uploadedAt: "asc" } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
   }
 
