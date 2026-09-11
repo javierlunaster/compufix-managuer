@@ -60,7 +60,11 @@ const ORDER_DETAIL_INCLUDE = {
     },
     warranties: { orderBy: { deliveryDate: "desc" } },
     photos: {
-        where: { repairLogId: null },
+        // Ni de bitácora ni de un diagnóstico puntual — mismo filtro que ya
+        // usa AttachmentsService.findGeneralPhotosForOrder(); este campo se
+        // había quedado desactualizado cuando se agregaron las fotos de
+        // diagnóstico, dejando que se colaran aquí también.
+        where: { repairLogId: null, diagnosticId: null },
         orderBy: { uploadedAt: "desc" },
         include: { uploadedBy: { select: { id: true, fullName: true } } },
     },

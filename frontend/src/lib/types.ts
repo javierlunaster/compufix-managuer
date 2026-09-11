@@ -513,6 +513,24 @@ export type IssueCount = { issue: string; count: number };
 // — ver customer-portal.service.ts en el backend para el detalle exacto
 // de qué se excluye y por qué.
 
+export type PortalQuotationSummary = {
+  id: number;
+  quotationNumber: string;
+  date: string;
+  status: QuotationStatus;
+  total: string;
+  validUntil?: string | null;
+  sourceOrder?: { id: number; orderCode: string } | null;
+};
+
+export type PortalQuotationDetail = PortalQuotationSummary & {
+  subtotal: string;
+  discount: string;
+  tax: string;
+  shipping: string;
+  items: { id: number; description: string; quantity: number; unitPrice: string; subtotal: string }[];
+};
+
 export type PortalOrderSummary = {
   id: number;
   orderCode: string;
@@ -536,7 +554,7 @@ export type PortalOrderDetail = PortalOrderSummary & {
   keyboardReceived: boolean;
   mouseReceived: boolean;
   device: PortalOrderSummary["device"] & { serialNumber?: string | null };
-  photos: { id: number; fileUrl: string; uploadedAt: string }[];
+  photos: { id: number; fileUrl: string; uploadedAt: string; category?: string | null }[];
   payments: { id: number; date: string; amount: string; method: string }[];
   warranties: {
     id: number;

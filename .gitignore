@@ -1,0 +1,28 @@
+# Dependencias e instalaciones
+node_modules/
+
+# Compilados
+dist/
+build/
+
+# Variables de entorno reales — NUNCA subir esto a ningún lado
+.env
+.env.local
+.env.prod
+
+# Datos y respaldos locales
+backend/uploads/
+backups/
+deploy/migration-export/
+
+# Instalador ya compilado (se genera con Inno Setup, no es código fuente)
+installer/Output/
+
+# Logs y archivos temporales del sistema operativo
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

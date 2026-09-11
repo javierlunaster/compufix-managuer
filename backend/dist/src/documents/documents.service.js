@@ -1,20 +1,55 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentsService = void 0;
 const common_1 = require("@nestjs/common");
+const path = __importStar(require("path"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const repair_orders_service_1 = require("../repair-orders/repair-orders.service");
 const pdf_builder_util_1 = require("../common/pdf/pdf-builder.util");
+const multer_config_1 = require("../attachments/multer.config");
 const format_util_1 = require("../common/utils/format.util");
 const repair_status_labels_util_1 = require("../common/utils/repair-status-labels.util");
 let DocumentsService = class DocumentsService {
@@ -72,6 +107,18 @@ let DocumentsService = class DocumentsService {
                 }
                 if (d.result)
                     pdf.paragraph(`Resultado del diagnóstico: ${d.result}`);
+                // Las fotos subidas desde la pestaña Diagnóstico ("trabajo
+                // realizado y estado final") nunca se estaban incluyendo aquí —
+                // solo las de las dos galerías de la pestaña Información
+                // (estado de ingreso/entrega). Se agregan junto a su propio
+                // diagnóstico, no en una sección aparte, porque documentan
+                // específicamente ese paso técnico.
+                if (d.photos.length > 0) {
+                    pdf.photoGrid(d.photos.map((p) => ({
+                        path: path.join(multer_config_1.UPLOADS_DIR, path.basename(p.fileUrl)),
+                        caption: (0, format_util_1.formatDate)(p.uploadedAt),
+                    })));
+                }
             }
         }
         if (order.procedures.length > 0 || order.logs.length > 0) {
@@ -88,13 +135,37 @@ let DocumentsService = class DocumentsService {
         }
         // El schema no tiene un campo dedicado de "recomendaciones" (sección 24
         // del brief lo pide, pero no se modeló como columna propia — ver README
-        // de esta fase). Se usa el resultado del último diagnóstico y las notas
-        // generales de la orden como la aproximación más honesta disponible.
-        const lastDiagnostic = order.diagnostics[0];
+        // de esta fase). Antes esta sección repetía el resultado del último
+        // diagnóstico, que YA se imprime arriba dentro de "Diagnóstico" — el
+        // mismo párrafo aparecía dos veces con encabezados distintos. Ahora
+        // solo muestra las notas generales de la orden (Editar información →
+        // "Notas generales"), que es información realmente distinta al
+        // resultado técnico del diagnóstico.
         pdf
-            .sectionTitle("Resultado y recomendaciones")
-            .paragraph([lastDiagnostic?.result, order.notes].filter(Boolean).join(" — ") ||
-            "Sin observaciones adicionales.");
+            .sectionTitle("Recomendaciones y notas generales")
+            .paragraph(order.notes || "Sin observaciones adicionales.");
+        // Evidencia fotográfica: separada en dos momentos distintos porque
+        // responde a la pregunta que motivó esta sección — dejar constancia
+        // de en qué estado llegó el equipo (protege al taller de un reclamo
+        // por un daño previo) y en qué estado se entrega (protege al cliente,
+        // confirma que el trabajo se hizo). "equipo_recibido" y sin categoría
+        // (fotos subidas antes de esta separación) cuentan como ingreso.
+        const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+        const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
+        if (intakePhotos.length > 0) {
+            pdf.sectionTitle("Evidencia fotográfica — estado de ingreso");
+            pdf.photoGrid(intakePhotos.map((p) => ({
+                path: path.join(multer_config_1.UPLOADS_DIR, path.basename(p.fileUrl)),
+                caption: (0, format_util_1.formatDate)(p.uploadedAt),
+            })));
+        }
+        if (deliveryPhotos.length > 0) {
+            pdf.sectionTitle("Evidencia fotográfica — estado de entrega");
+            pdf.photoGrid(deliveryPhotos.map((p) => ({
+                path: path.join(multer_config_1.UPLOADS_DIR, path.basename(p.fileUrl)),
+                caption: (0, format_util_1.formatDate)(p.uploadedAt),
+            })));
+        }
         pdf.sectionTitle("Garantía");
         if (order.warranties.length > 0) {
             const w = order.warranties[0];

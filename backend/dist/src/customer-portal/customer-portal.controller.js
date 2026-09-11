@@ -44,6 +44,18 @@ let CustomerPortalController = class CustomerPortalController {
     findMyOrderDetail(customer, orderId) {
         return this.customerPortalService.findMyOrderDetail(customer.id, orderId);
     }
+    findMyQuotations(customer) {
+        return this.customerPortalService.findMyQuotations(customer.id);
+    }
+    findMyQuotationDetail(customer, quotationId) {
+        return this.customerPortalService.findMyQuotationDetail(customer.id, quotationId);
+    }
+    approveMyQuotation(customer, quotationId) {
+        return this.customerPortalService.approveMyQuotation(customer.id, quotationId);
+    }
+    rejectMyQuotation(customer, quotationId) {
+        return this.customerPortalService.rejectMyQuotation(customer.id, quotationId);
+    }
 };
 exports.CustomerPortalController = CustomerPortalController;
 __decorate([
@@ -71,6 +83,41 @@ __decorate([
     __metadata("design:paramtypes", [Object, Number]),
     __metadata("design:returntype", void 0)
 ], CustomerPortalController.prototype, "findMyOrderDetail", null);
+__decorate([
+    (0, common_1.UseGuards)(customer_jwt_auth_guard_1.CustomerJwtAuthGuard),
+    (0, common_1.Get)("my-quotations"),
+    __param(0, (0, current_customer_decorator_1.CurrentCustomer)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], CustomerPortalController.prototype, "findMyQuotations", null);
+__decorate([
+    (0, common_1.UseGuards)(customer_jwt_auth_guard_1.CustomerJwtAuthGuard),
+    (0, common_1.Get)("my-quotations/:id"),
+    __param(0, (0, current_customer_decorator_1.CurrentCustomer)()),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Number]),
+    __metadata("design:returntype", void 0)
+], CustomerPortalController.prototype, "findMyQuotationDetail", null);
+__decorate([
+    (0, common_1.UseGuards)(customer_jwt_auth_guard_1.CustomerJwtAuthGuard),
+    (0, common_1.Post)("my-quotations/:id/approve"),
+    __param(0, (0, current_customer_decorator_1.CurrentCustomer)()),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Number]),
+    __metadata("design:returntype", void 0)
+], CustomerPortalController.prototype, "approveMyQuotation", null);
+__decorate([
+    (0, common_1.UseGuards)(customer_jwt_auth_guard_1.CustomerJwtAuthGuard),
+    (0, common_1.Post)("my-quotations/:id/reject"),
+    __param(0, (0, current_customer_decorator_1.CurrentCustomer)()),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Number]),
+    __metadata("design:returntype", void 0)
+], CustomerPortalController.prototype, "rejectMyQuotation", null);
 exports.CustomerPortalController = CustomerPortalController = __decorate([
     (0, common_1.Controller)("customer-portal"),
     (0, public_decorator_1.Public)(),

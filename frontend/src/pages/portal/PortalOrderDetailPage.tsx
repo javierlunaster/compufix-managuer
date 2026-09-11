@@ -41,6 +41,8 @@ export function PortalOrderDetailPage() {
   }
 
   const balance = Number(order.totalValue) - Number(order.paidAmount);
+  const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
+  const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
 
   return (
     <div className="space-y-4">
@@ -93,15 +95,32 @@ export function PortalOrderDetailPage() {
         </dl>
       </Card>
 
-      {order.photos.length > 0 && (
+      {intakePhotos.length > 0 && (
         <Card>
-          <CardHeader title="Fotos del equipo" />
+          <CardHeader title="Estado de ingreso" subtitle="Cómo llegó tu equipo al taller" />
           <div className="flex flex-wrap gap-2 p-4">
-            {order.photos.map((p) => (
+            {intakePhotos.map((p) => (
               <a key={p.id} href={`${API_ORIGIN}${p.fileUrl}`} target="_blank" rel="noreferrer">
                 <img
                   src={`${API_ORIGIN}${p.fileUrl}`}
-                  alt="Evidencia del equipo"
+                  alt="Estado de ingreso"
+                  className="h-20 w-20 rounded border border-border object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {deliveryPhotos.length > 0 && (
+        <Card>
+          <CardHeader title="Estado de entrega" subtitle="Cómo quedó tu equipo al terminar" />
+          <div className="flex flex-wrap gap-2 p-4">
+            {deliveryPhotos.map((p) => (
+              <a key={p.id} href={`${API_ORIGIN}${p.fileUrl}`} target="_blank" rel="noreferrer">
+                <img
+                  src={`${API_ORIGIN}${p.fileUrl}`}
+                  alt="Estado de entrega"
                   className="h-20 w-20 rounded border border-border object-cover"
                 />
               </a>

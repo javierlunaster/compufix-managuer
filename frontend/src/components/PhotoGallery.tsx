@@ -16,11 +16,18 @@ export function PhotoGallery({
   uploadUrl,
   onChanged,
   compact,
+  category,
 }: {
   photos: Attachment[];
   uploadUrl: string;
   onChanged: () => void;
   compact?: boolean;
+  // "equipo_recibido" | "resultado_final" | undefined — deja que el mismo
+  // Attachment.category (existía desde la Fase 15, sin usar hasta ahora)
+  // distinga estado de ingreso vs. estado de entrega dentro de la misma
+  // "bolsa" de fotos generales de la orden. Sin esto, la foto queda sin
+  // categoría (comportamiento de siempre).
+  category?: string;
 }) {
   const [files, setFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -33,6 +40,9 @@ export function PhotoGallery({
     try {
       const formData = new FormData();
       Array.from(files).forEach((f) => formData.append("files", f));
+      if (category) {
+        formData.append("category", category);
+      }
       await api.postForm(uploadUrl, formData);
       setFiles(null);
       onChanged();

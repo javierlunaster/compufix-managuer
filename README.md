@@ -2660,6 +2660,167 @@ Genera de nuevo el PDF de la misma cotización (o cualquier otro de los cinco do
 
 ---
 
+# Lanzador de Escritorio para Modo Desarrollo
+
+## Por qué esto es distinto al instalador de Windows (Fase anterior)
+
+El instalador que se construyó antes (`installer/`) empaqueta el backend y el frontend como imágenes de Docker — pensado para **distribuir** la aplicación a la máquina de un taller que solo la va a *usar*, no a seguir desarrollando. Reconstruir esas imágenes cada vez que cambia una línea de código sería lentísimo para trabajar día a día. Este lanzador es para el escenario contrario: seguir programando localmente, con recarga en caliente tanto del backend (`nest start --watch`) como del frontend (`vite dev`), evitando tener que abrir tres terminales a mano cada vez.
+
+## Qué se construyó
+
+- **`start-compufix-dev.bat`** — verifica que Docker Desktop esté corriendo, levanta Postgres (`docker compose up -d`, el `docker-compose.yml` de siempre), abre el backend y el frontend cada uno en su propia ventana de consola, espera unos segundos, y abre el navegador en `http://localhost:5173`.
+- **`stop-compufix-dev.bat`** — detiene la base de datos (`docker compose down`, sin borrar datos). Deliberadamente **no** cierra las ventanas del backend/frontend de forma automática — forzar el cierre de esas ventanas podría cortar algo a medio hacer sin avisar; se cierran a mano con Ctrl+C o cerrando la ventana.
+
+## Cómo poner el ícono en el Escritorio
+
+1. Abre la carpeta del proyecto en el Explorador de Windows (`C:\dev\compufix-manager-claude` o donde la tengas).
+2. Clic derecho sobre `start-compufix-dev.bat` → **Enviar a** → **Escritorio (crear acceso directo)**.
+3. En el Escritorio, puedes renombrar el acceso directo a "COMPufix Manager" y, si quieres, cambiarle el ícono (clic derecho → Propiedades → Cambiar icono).
+4. Repite lo mismo con `stop-compufix-dev.bat` si quieres un ícono aparte para detener todo.
+
+## Decisiones técnicas clave
+
+1. **Un archivo `.bat`, no un script de PowerShell.** PowerShell exige lidiar con políticas de ejecución (`ExecutionPolicy`) que suelen bloquear scripts descargados o creados localmente sin firmar, generando fricción justo en el paso que se quería hacer más simple. Un `.bat` corre con doble clic sin ninguna advertencia de seguridad adicional en la configuración por defecto de Windows.
+2. **Backend y frontend abren en ventanas de consola separadas y visibles (`cmd /k`), no en segundo plano invisible.** Así se pueden ver los logs de cada uno en vivo mientras se desarrolla — exactamente lo que ya se hacía manualmente con tres terminales, solo que ahora se abren solas.
+
+## Cómo probarlo
+
+No se modificó `schema.prisma` ni se agregaron dependencias — no hace falta migración ni `npm install`.
+
+Haz doble clic en `start-compufix-dev.bat` (o en su acceso directo del Escritorio, una vez creado) y confirma que el navegador abre solo en `http://localhost:5173` con la aplicación funcionando.
+
+---
+
+# Aprobación de Cotizaciones desde el Portal
+
+## De dónde salió esto
+
+De la lista de mejoras propuestas comparando contra lo que ofrecen sistemas del sector (RepairDesk, RepairShopr) — hoy el cliente podía *ver* su cotización en el portal, pero tenía que llamar al taller para aprobarla. Esto cierra ese paso.
+
+## Qué se construyó
+
+- **`customer-portal/`** gana cuatro rutas: listar las propias cotizaciones (`GET /customer-portal/my-quotations`), ver el detalle de una (`GET /customer-portal/my-quotations/:id`), y aprobar/rechazar (`POST .../approve`, `POST .../reject`) — cada una verificando que la cotización pertenezca al cliente autenticado antes de hacer nada, mismo patrón de seguridad que ya regía para "mis reparaciones".
+- **`pages/portal/PortalQuotationsPage.tsx`** / **`PortalQuotationDetailPage.tsx`** — lista y detalle en el portal, con los botones "Aprobar cotización" y "Rechazar" (este último con un paso de confirmación) visibles solo cuando la cotización sigue esperando respuesta (estados `SENT` o `PENDING`) — una vez aprobada, rechazada, convertida o vencida, esos botones desaparecen.
+- **Navegación simple agregada al encabezado del portal** ("Mis reparaciones" / "Mis cotizaciones"), ya que ahora hay dos secciones en vez de una.
+
+## Qué NO se automatizó — a propósito
+
+**Aprobar desde el portal solo cambia el estado a "Aprobada"; no convierte la cotización en una orden de reparación automáticamente.** Esa conversión sigue siendo el botón manual "Convertir en reparación" que ya usa el personal (Fase 7) — se decidió no disparar ese paso sin supervisión, porque convertir una cotización mueve inventario real (los repuestos quedan reservados/consumidos) y vale la pena que alguien del taller lo confirme, no que ocurra automáticamente por un clic del cliente sin que nadie del lado del taller se entere en el momento.
+
+## Una limitación real que quedó documentada, no oculta
+
+**La aprobación/rechazo del cliente no queda registrada en el sistema de auditoría (`AuditLog`).** Se revisó esa tabla antes de construir esto: `AuditLog.userId` es obligatorio y apunta a la tabla de personal (`User`), no a `Customer` — no hay una forma limpia de atribuir esta acción sin inventar un usuario de personal falso, lo cual sería peor que no registrarla. El cambio de estado en sí mismo (`status: APPROVED` o `REJECTED`) sí queda guardado y visible para el personal como cualquier otro cambio de estado — lo que falta es específicamente el rastro de auditoría de "quién lo hizo y cuándo" con el mismo detalle que tienen las acciones del personal. Si esto llega a ser importante (por ejemplo, para resolver una disputa de "yo nunca aprobé esto"), es una ampliación puntual: agregar un `customerId` opcional a `AuditLog`, tratada como su propia entrega en vez de mezclarla aquí sin avisar.
+
+## Cómo ejecutar esto localmente
+
+No se modificó `schema.prisma` ni se agregaron dependencias — no hace falta migración ni `npm install`.
+
+```bash
+cd backend && npm run start:dev
+cd frontend && npm run dev
+```
+
+Crea una cotización desde el personal, cámbiala a estado "Enviada", entra al portal con el documento de ese cliente, ve a "Mis cotizaciones", ábrela y apruébala — confirma que el personal ve el nuevo estado "Aprobada" al recargar la cotización desde su lado, y que el botón "Convertir en reparación" sigue siendo una acción manual suya.
+
+---
+
+# Vista Financiera: Ingresos y Egresos Diarios
+
+## De dónde salió esto
+
+De la misma lista de mejoras propuestas comparando contra el sector — un taller necesita ver "cómo va el negocio" más allá del gráfico de 6 meses que ya tenía el Dashboard, con la posibilidad de filtrar un mes específico y ver el detalle día por día.
+
+## El hallazgo más importante de esta construcción: evitar contar el mismo ingreso dos veces
+
+Antes de escribir una sola línea de la consulta, se revisó cómo se relacionan entre sí las cuatro fuentes de dinero del sistema, porque hay una trampa real: **un pago (`Payment`) que se registra con una caja abierta genera automáticamente un movimiento de caja espejo** (`CashMovement` con `paymentId` apuntando a ese pago — este comportamiento "mejor esfuerzo" se construyó desde la Fase 9). Sumar `Payment.amount` y **todos** los `CashMovement` de tipo ingreso al mismo tiempo habría contado ese dinero dos veces — un error de los que no se nota en pantalla pero infla las cifras de ingresos de forma silenciosa y consistente.
+
+La solución: los movimientos de caja de tipo ingreso solo se cuentan cuando **no** tienen un pago asociado (`paymentId IS NULL`) — es decir, solo los ingresos que alguien registró manualmente en Caja sin que vinieran de un pago real. Las ventas de mostrador (`Sale`) se confirmó que nunca generan ni un `Payment` ni un `CashMovement` automáticamente (se registran como ya cobradas en el momento de la venta), así que se suman aparte sin riesgo de duplicado.
+
+## Qué se construyó
+
+- **`finance/`** (backend) — un módulo nuevo, restringido a Administrador/Gerente (mismo criterio que el Dashboard, por ser cifras financieras sensibles). `GET /finance/daily?year=&month=` devuelve el detalle día por día del mes completo (incluidos los días sin ningún movimiento, en cero, para que la gráfica muestre el mes entero) más un resumen con el desglose por fuente.
+- **`pages/FinancePage.tsx`** — selector de mes/año, tres indicadores (ingresos, egresos, resultado neto — en verde o rojo según el signo), una gráfica de barras de ingresos vs. egresos por día, y dos tarjetas de desglose ("de dónde vienen los ingresos" / "a dónde van los egresos").
+- **"Finanzas" en el menú lateral**, visible solo para Administrador y Gerente.
+
+## Una simplificación deliberada, documentada en la propia pantalla
+
+**Las compras a proveedores se cuentan como egreso en la fecha de la compra, sin importar si ya se pagaron por completo.** El modelo `Purchase` tiene un estado de pago (`paymentStatus`: pendiente/parcial/pagada) pero no una fecha de "pago real" separada de la fecha de la compra misma — así que no hay de dónde sacar una fecha de egreso más precisa sin agregar ese campo al modelo. Se documentó esto directamente en la interfaz (no solo en este README) para que nadie interprete la cifra de egresos como "dinero que ya salió de la cuenta ese día exacto" cuando en realidad puede representar una compra a crédito todavía por pagar.
+
+## Cómo ejecutar esto localmente
+
+No se modificó `schema.prisma` ni se agregaron dependencias — no hace falta migración ni `npm install`.
+
+```bash
+cd backend && npm run start:dev
+cd frontend && npm run dev
+```
+
+Entra a Finanzas, cambia el mes/año, y confirma que los totales de ingresos coinciden con lo que ya ves en Caja y en Ventas para ese mismo período (sin verse inflados por duplicados).
+
+---
+
+# Fotos Reales Dentro del PDF del Informe Técnico
+
+## De dónde salió esto
+
+Quedó documentado explícitamente desde la Fase 15 ("Fotos de Trabajo Realizado y Estado Final") que incrustar imágenes reales en el PDF con PDFKit era una pieza de trabajo más grande, dejada fuera a propósito por alcance. Esta entrega es exactamente esa ampliación puntual, ahora que hacía falta de verdad: dejar constancia impresa del estado de ingreso y del estado de entrega de un equipo.
+
+## Un descuido real que apareció al revisar esto — corregido antes de construir nada nuevo
+
+Al revisar cómo separar "estado de ingreso" de "estado de entrega", se encontró que el filtro de la galería general de fotos dentro del detalle completo de la orden (`ORDER_DETAIL_INCLUDE` en `repair-orders.service.ts`) **se había quedado desactualizado** cuando se agregaron las fotos de diagnóstico: excluía las de bitácora pero no las de diagnóstico, a diferencia del endpoint independiente (`AttachmentsService.findGeneralPhotosForOrder()`), que sí lo hacía correctamente desde esa misma fase. Esto significaba que las fotos de un diagnóstico se colaban también en la galería general que ve el personal en la pestaña Información — se corrigió antes de construir la separación de categorías sobre una base que ya tenía ese problema.
+
+## Qué se construyó
+
+- **`Attachment.category`** — el campo ya existía desde la Fase 15 (pensado exactamente para esto, con "equipo_recibido" y "resultado_final" sugeridos en su propio comentario original) pero nunca se usaba desde la interfaz. Ahora `PhotoGallery` acepta una categoría opcional al subir, y la pestaña Información del expediente técnico quedó dividida en dos galerías separadas: **"Fotos: estado de ingreso"** y **"Fotos: estado de entrega"** — cada una sube directamente a su categoría correspondiente.
+- **`PdfBuilder.photoGrid()`** (nuevo) — cuadrícula de fotos con salto de página automático (revisa antes de cada fila si cabe en lo que queda de página, igual que ya hacían `table()`/`keyValueGrid()`), y una red de seguridad: si una foto no se puede incrustar (formato no compatible, archivo dañado o ya no existe en disco), la celda muestra un aviso de texto en vez de romper la generación de todo el documento.
+- **`generateTechnicalReport()`** ahora incluye dos secciones nuevas — "Evidencia fotográfica — estado de ingreso" y "— estado de entrega" — justo después de "Resultado y recomendaciones", cada una con las fotos de su categoría en una cuadrícula de 3 columnas con la fecha como pie de foto.
+- **El portal de clientes** también quedó separado en "Estado de ingreso" / "Estado de entrega" en vez de una sola galería mezclada, con el mismo criterio de categoría.
+
+## Una limitación técnica real, no ignorada
+
+**PDFKit no decodifica WEBP ni GIF** — solo JPEG y PNG de forma nativa. El sistema sigue aceptando esos cuatro formatos al subir una foto (`attachments/multer.config.ts`, sin cambios), así que es posible que alguien suba un WEBP y, al generar el PDF, esa celda específica aparezca con el aviso "Imagen no disponible para impresión" en vez de la foto — el archivo sigue intacto y se ve perfecto en la interfaz web, solo no se puede incrustar en el documento impreso. No se agregó una librería de conversión de imágenes (como `sharp`) para resolver esto — habría sido una dependencia nueva y más pesada para un caso que, en la práctica, casi no ocurre (la inmensa mayoría de fotos tomadas desde un celular ya son JPEG).
+
+## Cómo ejecutar esto localmente
+
+No se modificó `schema.prisma` ni se agregaron dependencias — no hace falta migración ni `npm install`.
+
+```bash
+cd backend && npm run start:dev
+cd frontend && npm run dev
+```
+
+Sube un par de fotos en "Fotos: estado de ingreso" y otro par en "Fotos: estado de entrega" de una orden, descarga su informe técnico, y confirma que aparecen en sus respectivas secciones dentro del PDF, con salto de página limpio si hay muchas.
+
+---
+
+# Detalles Técnicos del Equipo Directamente en la Recepción
+
+## El hueco que cerró esta fase
+
+`NewDeviceDto` (usado al crear una orden con un equipo nuevo) ya aceptaba placa, procesador, RAM, disco y sistema operativo desde que se diseñó — es literalmente el mismo `CreateDeviceDto` completo, sin duplicar el campo de cliente. El formulario de recepción, sin embargo, **nunca mostró esos campos**, solo tipo/marca/modelo/serial. Para completarlos había que terminar de crear la orden, ir a la ficha del cliente, buscar el equipo, entrar a su detalle, y recién ahí editar — el camino largo que se quería evitar.
+
+## Qué se construyó
+
+- **Equipo nuevo**: los cinco campos (placa, procesador, RAM, disco, sistema operativo) aparecen directamente en el formulario de recepción, todos opcionales, sin ningún clic adicional ni pantalla intermedia — se envían junto con el resto de la orden en la misma solicitud.
+- **Equipo ya registrado**: al seleccionar un equipo de la lista, aparece un resumen de sus datos técnicos actuales (o un aviso de que todavía no tiene ninguno) con un enlace "Editar detalles técnicos" que despliega los mismos cinco campos, prellenados. Guardar ahí llama directo a `PATCH /devices/:id` — **independiente de crear la orden** — así que el cambio queda guardado aunque la persona todavía no haya terminado de llenar el resto del formulario.
+
+## Decisión clave: dos rutas de guardado distintas, a propósito
+
+Para equipo **nuevo**, los detalles técnicos viajan junto con el resto de la orden en una sola solicitud (tiene sentido: el equipo no existe todavía, no hay nada que actualizar por separado). Para equipo **ya registrado**, se decidió que la edición de sus specs sea una acción independiente, inmediata, en vez de esperar a que se envíe el formulario completo de la orden — porque el equipo ya existe y esa información es del equipo en sí, no de esta reparación puntual; tiene más sentido que se guarde de una vez, no que dependa de que la persona complete y confirme toda la recepción primero.
+
+## Cómo ejecutar esto localmente
+
+No se modificó `schema.prisma` ni se agregaron dependencias — no hace falta migración ni `npm install`. Tampoco se tocó el backend: `NewDeviceDto` y `PATCH /devices/:id` ya aceptaban estos campos desde antes, era exclusivamente un hueco de la interfaz.
+
+```bash
+cd backend && npm run start:dev
+cd frontend && npm run dev
+```
+
+Recibe un equipo nuevo llenando también sus detalles técnicos, y confirma que quedan guardados entrando después a su ficha. Luego recibe otra reparación para un equipo ya existente, edita sus detalles técnicos desde el propio formulario de recepción sin terminar de crear la orden todavía, y confirma que el cambio ya quedó guardado.
+
+---
+
 # Instalador de Windows para Distribución
 
 ## Por qué esto es distinto a `docker-compose.prod.yml` (Fase 14)

@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import * as path from "path";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
 import { PdfBuilder } from "../common/pdf/pdf-builder.util";
+import { UPLOADS_DIR } from "../attachments/multer.config";
 import { formatCurrency, formatDate, formatDateTime } from "../common/utils/format.util";
 import { REPAIR_STATUS_LABELS } from "../common/utils/repair-status-labels.util";
 
@@ -70,6 +72,21 @@ export class DocumentsService {
           );
         }
         if (d.result) pdf.paragraph(`Resultado del diagnóstico: ${d.result}`);
+
+        // Las fotos subidas desde la pestaña Diagnóstico ("trabajo
+        // realizado y estado final") nunca se estaban incluyendo aquí —
+        // solo las de las dos galerías de la pestaña Información
+        // (estado de ingreso/entrega). Se agregan junto a su propio
+        // diagnóstico, no en una sección aparte, porque documentan
+        // específicamente ese paso técnico.
+        if (d.photos.length > 0) {
+          pdf.photoGrid(
+            d.photos.map((p) => ({
+              path: path.join(UPLOADS_DIR, path.basename(p.fileUrl)),
+              caption: formatDate(p.uploadedAt),
+            })),
+          );
+        }
       }
     }
 
@@ -92,15 +109,44 @@ export class DocumentsService {
 
     // El schema no tiene un campo dedicado de "recomendaciones" (sección 24
     // del brief lo pide, pero no se modeló como columna propia — ver README
-    // de esta fase). Se usa el resultado del último diagnóstico y las notas
-    // generales de la orden como la aproximación más honesta disponible.
-    const lastDiagnostic = order.diagnostics[0];
+    // de esta fase). Antes esta sección repetía el resultado del último
+    // diagnóstico, que YA se imprime arriba dentro de "Diagnóstico" — el
+    // mismo párrafo aparecía dos veces con encabezados distintos. Ahora
+    // solo muestra las notas generales de la orden (Editar información →
+    // "Notas generales"), que es información realmente distinta al
+    // resultado técnico del diagnóstico.
     pdf
-      .sectionTitle("Resultado y recomendaciones")
-      .paragraph(
-        [lastDiagnostic?.result, order.notes].filter(Boolean).join(" — ") ||
-          "Sin observaciones adicionales.",
+      .sectionTitle("Recomendaciones y notas generales")
+      .paragraph(order.notes || "Sin observaciones adicionales.");
+
+    // Evidencia fotográfica: separada en dos momentos distintos porque
+    // responde a la pregunta que motivó esta sección — dejar constancia
+    // de en qué estado llegó el equipo (protege al taller de un reclamo
+    // por un daño previo) y en qué estado se entrega (protege al cliente,
+    // confirma que el trabajo se hizo). "equipo_recibido" y sin categoría
+    // (fotos subidas antes de esta separación) cuentan como ingreso.
+    const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+    const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
+
+    if (intakePhotos.length > 0) {
+      pdf.sectionTitle("Evidencia fotográfica — estado de ingreso");
+      pdf.photoGrid(
+        intakePhotos.map((p) => ({
+          path: path.join(UPLOADS_DIR, path.basename(p.fileUrl)),
+          caption: formatDate(p.uploadedAt),
+        })),
       );
+    }
+
+    if (deliveryPhotos.length > 0) {
+      pdf.sectionTitle("Evidencia fotográfica — estado de entrega");
+      pdf.photoGrid(
+        deliveryPhotos.map((p) => ({
+          path: path.join(UPLOADS_DIR, path.basename(p.fileUrl)),
+          caption: formatDate(p.uploadedAt),
+        })),
+      );
+    }
 
     pdf.sectionTitle("Garantía");
     if (order.warranties.length > 0) {

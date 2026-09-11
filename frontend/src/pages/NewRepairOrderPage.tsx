@@ -36,6 +36,11 @@ export function NewRepairOrderPage() {
   const [brandId, setBrandId] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
+  const [boardModel, setBoardModel] = useState("");
+  const [cpu, setCpu] = useState("");
+  const [ram, setRam] = useState("");
+  const [disk, setDisk] = useState("");
+  const [operatingSystem, setOperatingSystem] = useState("");
 
   const [reportedIssue, setReportedIssue] = useState("");
   const [entryReason, setEntryReason] = useState("");
@@ -109,6 +114,11 @@ export function NewRepairOrderPage() {
                 brandId: brandId ? Number(brandId) : undefined,
                 model: model || undefined,
                 serialNumber: serialNumber || undefined,
+                boardModel: boardModel || undefined,
+                cpu: cpu || undefined,
+                ram: ram || undefined,
+                disk: disk || undefined,
+                operatingSystem: operatingSystem || undefined,
               }
             : undefined,
         reportedIssue,
@@ -241,16 +251,26 @@ export function NewRepairOrderPage() {
             </div>
 
             {deviceMode === "existing" ? (
-              <Field label="Equipo del cliente">
-                <Select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-                  <option value="">Selecciona…</option>
-                  {existingDevices.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.brand?.name} {d.model} {d.serialNumber ? `(${d.serialNumber})` : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+              <>
+                <Field label="Equipo del cliente">
+                  <Select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+                    <option value="">Selecciona…</option>
+                    {existingDevices.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.brand?.name} {d.model} {d.serialNumber ? `(${d.serialNumber})` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                {deviceId && (
+                  <ExistingDeviceSpecs
+                    device={existingDevices.find((d) => d.id === Number(deviceId))}
+                    onUpdated={(updated) =>
+                      setExistingDevices((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))
+                    }
+                  />
+                )}
+              </>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3">
@@ -282,6 +302,25 @@ export function NewRepairOrderPage() {
                   </Field>
                   <Field label="Número de serie">
                     <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Placa (opcional)">
+                    <Input value={boardModel} onChange={(e) => setBoardModel(e.target.value)} />
+                  </Field>
+                  <Field label="Sistema operativo (opcional)">
+                    <Input value={operatingSystem} onChange={(e) => setOperatingSystem(e.target.value)} />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Procesador (opcional)">
+                    <Input value={cpu} onChange={(e) => setCpu(e.target.value)} />
+                  </Field>
+                  <Field label="RAM (opcional)">
+                    <Input value={ram} onChange={(e) => setRam(e.target.value)} />
+                  </Field>
+                  <Field label="Disco (opcional)">
+                    <Input value={disk} onChange={(e) => setDisk(e.target.value)} />
                   </Field>
                 </div>
               </>
@@ -353,5 +392,109 @@ function Checkbox({
       />
       {label}
     </label>
+  );
+}
+
+/**
+ * Resumen + edición rápida de las especificaciones de un equipo ya
+ * registrado, sin salir del formulario de recepción. Antes, actualizar
+ * estos datos exigía terminar de crear la orden, ir a la ficha del
+ * cliente, buscar el equipo, entrar a su detalle, y recién ahí editar —
+ * el mismo camino largo que se quería evitar también para equipo nuevo.
+ * Guarda directo con PATCH /devices/:id (independiente de crear la
+ * orden), así que el cambio queda aunque la persona todavía no haya
+ * terminado de llenar el resto del formulario.
+ */
+function ExistingDeviceSpecs({
+  device,
+  onUpdated,
+}: {
+  device: Device | undefined;
+  onUpdated: (updated: Device) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [boardModel, setBoardModel] = useState(device?.boardModel ?? "");
+  const [cpu, setCpu] = useState(device?.cpu ?? "");
+  const [ram, setRam] = useState(device?.ram ?? "");
+  const [disk, setDisk] = useState(device?.disk ?? "");
+  const [operatingSystem, setOperatingSystem] = useState(device?.operatingSystem ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!device) return null;
+
+  const hasSpecs = device.cpu || device.ram || device.disk || device.operatingSystem || device.boardModel;
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      const updated = await api.patch<Device>(`/devices/${device!.id}`, {
+        boardModel: boardModel || undefined,
+        cpu: cpu || undefined,
+        ram: ram || undefined,
+        disk: disk || undefined,
+        operatingSystem: operatingSystem || undefined,
+      });
+      onUpdated(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudieron guardar los detalles");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={handleSave} className="space-y-3 rounded border border-border bg-bg p-3">
+        {error && <ErrorBanner message={error} />}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Placa (opcional)">
+            <Input value={boardModel} onChange={(e) => setBoardModel(e.target.value)} />
+          </Field>
+          <Field label="Sistema operativo (opcional)">
+            <Input value={operatingSystem} onChange={(e) => setOperatingSystem(e.target.value)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Procesador (opcional)">
+            <Input value={cpu} onChange={(e) => setCpu(e.target.value)} />
+          </Field>
+          <Field label="RAM (opcional)">
+            <Input value={ram} onChange={(e) => setRam(e.target.value)} />
+          </Field>
+          <Field label="Disco (opcional)">
+            <Input value={disk} onChange={(e) => setDisk(e.target.value)} />
+          </Field>
+        </div>
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? "Guardando…" : "Guardar detalles"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="rounded border border-border bg-bg p-3 text-sm">
+      {hasSpecs ? (
+        <p className="text-ink-muted">
+          {[device.boardModel, device.cpu, device.ram, device.disk, device.operatingSystem]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      ) : (
+        <p className="text-ink-muted">Este equipo todavía no tiene detalles técnicos guardados.</p>
+      )}
+      <button type="button" onClick={() => setEditing(true)} className="mt-1 text-xs text-accent hover:underline">
+        {hasSpecs ? "Editar detalles técnicos" : "+ Agregar detalles técnicos"}
+      </button>
+    </div>
   );
 }

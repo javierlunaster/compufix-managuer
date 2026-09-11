@@ -19,6 +19,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/sales", label: "Ventas", icon: CartIcon },
   { to: "/purchases", label: "Compras", icon: TruckIcon },
   { to: "/cash", label: "Caja", icon: CashIcon },
+  // Mismo criterio que el Dashboard (Fase 12): incluye cifras financieras
+  // que no todos los roles deberían ver de un vistazo, y el backend ya
+  // lo restringe a estos dos roles exactamente.
+  { to: "/finance", label: "Finanzas", icon: ChartIcon, roles: ["Administrador", "Gerente"] },
   // El backend restringe toda la gestión de usuarios a Administrador
   // (Fase 2) — mostrar este ítem a otros roles solo llevaría a una
   // pantalla que va a fallar con 403 en cada llamada.
@@ -182,6 +186,17 @@ function ShieldIcon({ className }: { className?: string }) {
     <svg {...iconProps(className)}>
       <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3z" />
       <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="6" />
+      <rect x="12" y="8" width="3" height="10" />
+      <rect x="17" y="5" width="3" height="13" />
     </svg>
   );
 }

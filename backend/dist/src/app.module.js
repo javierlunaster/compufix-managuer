@@ -38,6 +38,7 @@ const import_module_1 = require("./import/import.module");
 const health_module_1 = require("./health/health.module");
 const attachments_module_1 = require("./attachments/attachments.module");
 const customer_portal_module_1 = require("./customer-portal/customer-portal.module");
+const finance_module_1 = require("./finance/finance.module");
 const jwt_auth_guard_1 = require("./auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("./auth/guards/roles.guard");
 const all_exceptions_filter_1 = require("./common/filters/all-exceptions.filter");
@@ -80,6 +81,7 @@ exports.AppModule = AppModule = __decorate([
             health_module_1.HealthModule,
             attachments_module_1.AttachmentsModule,
             customer_portal_module_1.CustomerPortalModule,
+            finance_module_1.FinanceModule,
         ],
         providers: [
             // Orden de ejecución: ThrottlerGuard primero (protege incluso rutas

@@ -43,4 +43,37 @@ export class CustomerPortalController {
   ) {
     return this.customerPortalService.findMyOrderDetail(customer.id, orderId);
   }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Get("my-quotations")
+  findMyQuotations(@CurrentCustomer() customer: AuthenticatedCustomer) {
+    return this.customerPortalService.findMyQuotations(customer.id);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Get("my-quotations/:id")
+  findMyQuotationDetail(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.findMyQuotationDetail(customer.id, quotationId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotations/:id/approve")
+  approveMyQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.approveMyQuotation(customer.id, quotationId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotations/:id/reject")
+  rejectMyQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.rejectMyQuotation(customer.id, quotationId);
+  }
 }

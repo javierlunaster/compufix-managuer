@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { QuotationStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CustomerPortalLoginDto } from "./dto/customer-portal-login.dto";
 
@@ -96,7 +97,7 @@ export class CustomerPortalService {
         // hallazgo técnico interno no pensado para el cliente.
         photos: {
           where: { repairLogId: null },
-          select: { id: true, fileUrl: true, uploadedAt: true },
+          select: { id: true, fileUrl: true, uploadedAt: true, category: true },
           orderBy: { uploadedAt: "desc" },
         },
         payments: {
@@ -123,5 +124,103 @@ export class CustomerPortalService {
 
     const { customerId: _omit, ...safeOrder } = order;
     return safeOrder;
+  }
+
+  // --- Cotizaciones propias -------------------------------------------
+  // Una CustomerQuotation pertenece directamente a un Customer (no
+  // siempre a una orden — puede existir antes de que exista una orden,
+  // ver Fase 7), así que se listan aparte de "mis reparaciones", no
+  // anidadas dentro de una orden específica.
+
+  // Solo se puede aprobar/rechazar mientras sigue esperando respuesta.
+  // Una vez aprobada, rechazada, convertida o vencida, es historia — el
+  // cliente ya no puede "deshacer" esa decisión desde el portal.
+  private readonly APPROVABLE_STATUSES: QuotationStatus[] = [
+    QuotationStatus.SENT,
+    QuotationStatus.PENDING,
+  ];
+
+  findMyQuotations(customerId: number) {
+    return this.prisma.customerQuotation.findMany({
+      where: { customerId },
+      select: {
+        id: true,
+        quotationNumber: true,
+        date: true,
+        status: true,
+        total: true,
+        validUntil: true,
+        sourceOrder: { select: { id: true, orderCode: true } },
+      },
+      orderBy: { date: "desc" },
+    });
+  }
+
+  async findMyQuotationDetail(customerId: number, quotationId: number) {
+    const quotation = await this.prisma.customerQuotation.findUnique({
+      where: { id: quotationId },
+      select: {
+        id: true,
+        customerId: true,
+        quotationNumber: true,
+        date: true,
+        status: true,
+        subtotal: true,
+        discount: true,
+        tax: true,
+        shipping: true,
+        total: true,
+        validUntil: true,
+        sourceOrder: { select: { id: true, orderCode: true } },
+        items: {
+          select: { id: true, description: true, quantity: true, unitPrice: true, subtotal: true },
+        },
+        // "notes" queda fuera a propósito: es un campo de uso libre para
+        // el personal, sin una distinción de "nota interna" vs "nota
+        // para el cliente" en el modelo — más seguro no mostrarlo que
+        // exponer por accidente algo que no era para el cliente.
+      },
+    });
+
+    if (!quotation || quotation.customerId !== customerId) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+
+    const { customerId: _omit, ...safeQuotation } = quotation;
+    return safeQuotation;
+  }
+
+  private async ensureOwnedAndApprovable(customerId: number, quotationId: number) {
+    const quotation = await this.prisma.customerQuotation.findUnique({ where: { id: quotationId } });
+    if (!quotation || quotation.customerId !== customerId) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (!this.APPROVABLE_STATUSES.includes(quotation.status)) {
+      throw new BadRequestException("Esta cotización ya no está pendiente de tu respuesta");
+    }
+    return quotation;
+  }
+
+  /**
+   * Aprobar desde el portal solo cambia el estado — a propósito NO
+   * convierte la cotización en una orden de reparación automáticamente.
+   * Esa conversión sigue siendo un paso manual del personal ("Convertir
+   * en reparación", Fase 7), para que alguien del taller revise antes de
+   * que se dispare un movimiento de inventario real sin supervisión.
+   */
+  async approveMyQuotation(customerId: number, quotationId: number) {
+    await this.ensureOwnedAndApprovable(customerId, quotationId);
+    return this.prisma.customerQuotation.update({
+      where: { id: quotationId },
+      data: { status: QuotationStatus.APPROVED },
+    });
+  }
+
+  async rejectMyQuotation(customerId: number, quotationId: number) {
+    await this.ensureOwnedAndApprovable(customerId, quotationId);
+    return this.prisma.customerQuotation.update({
+      where: { id: quotationId },
+      data: { status: QuotationStatus.REJECTED },
+    });
   }
 }
