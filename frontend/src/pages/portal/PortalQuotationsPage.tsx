@@ -49,7 +49,10 @@ export function PortalQuotationsPage() {
                 >
                   <div>
                     <p className="font-mono text-accent">{q.quotationNumber}</p>
-                    <p className="text-sm text-ink-muted">{formatDate(q.date)}</p>
+                    <p className="text-sm text-ink-muted">
+                      {formatDate(q.date)}
+                      {q.sourceOrder && ` · ${q.sourceOrder.orderCode}`}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-ink">{QUOTATION_STATUS_LABELS[q.status]}</p>

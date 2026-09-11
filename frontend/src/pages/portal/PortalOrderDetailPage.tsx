@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { portalApi, PortalApiError, resolvePhotoUrl } from "@/lib/portalApi";
 import type { PortalOrderDetail } from "@/lib/types";
-import { WARRANTY_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
+import { WARRANTY_STATUS_LABELS, PAYMENT_METHOD_LABELS, QUOTATION_STATUS_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { Card, CardHeader, ErrorBanner, Spinner } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -94,6 +94,40 @@ export function PortalOrderDetailPage() {
           </div>
         </dl>
       </Card>
+
+      {order.quotations.length > 0 && (
+        <Card>
+          <CardHeader title="Cotizaciones de esta reparación" />
+          <ul className="divide-y divide-border">
+            {order.quotations.map((q) => {
+              const needsResponse = q.status === "SENT" || q.status === "PENDING";
+              return (
+                <li key={q.id}>
+                  <Link
+                    to={`/portal/quotations/${q.id}`}
+                    className="flex items-center justify-between gap-4 px-4 py-3 text-sm hover:bg-surface-raised"
+                  >
+                    <div>
+                      <p className="font-mono text-accent">{q.quotationNumber}</p>
+                      <p className="text-xs text-ink-muted">{formatDate(q.date)}</p>
+                    </div>
+                    <div className="text-right">
+                      {needsResponse ? (
+                        <p className="text-xs font-semibold uppercase tracking-wide text-warning">
+                          Requiere tu respuesta
+                        </p>
+                      ) : (
+                        <p className="text-xs text-ink-muted">{QUOTATION_STATUS_LABELS[q.status]}</p>
+                      )}
+                      <p className="tabular text-ink">{formatCurrency(q.total)}</p>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       {order.diagnostics.length > 0 && (
         <Card>

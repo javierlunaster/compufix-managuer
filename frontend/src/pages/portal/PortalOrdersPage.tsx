@@ -54,6 +54,11 @@ export function PortalOrdersPage() {
                     </p>
                   </div>
                   <div className="text-right">
+                    {o.quotations.length > 0 && (
+                      <p className="text-xs font-semibold uppercase tracking-wide text-warning">
+                        Cotización pendiente
+                      </p>
+                    )}
                     <p className="text-sm text-ink">{REPAIR_STATUS_LABELS[o.status]}</p>
                     <p className="text-xs text-ink-muted">{formatCurrency(o.totalValue)}</p>
                   </div>

@@ -528,6 +528,8 @@ export type PortalOrderSummary = {
     brand?: { name: string } | null;
     deviceType?: { name: string } | null;
   };
+  // Solo cotizaciones SENT/PENDING de esta orden — ver customer-portal.service.ts.
+  quotations: { id: number }[];
 };
 
 export type PortalQuotationSummary = {
@@ -548,7 +550,7 @@ export type PortalQuotationDetail = PortalQuotationSummary & {
   items: { id: number; description: string; quantity: number; unitPrice: string; subtotal: string }[];
 };
 
-export type PortalOrderDetail = PortalOrderSummary & {
+export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {
   reportedIssue: string;
   physicalCondition?: string | null;
   chargerReceived: boolean;
@@ -557,6 +559,9 @@ export type PortalOrderDetail = PortalOrderSummary & {
   mouseReceived: boolean;
   device: PortalOrderSummary["device"] & { serialNumber?: string | null };
   photos: { id: number; fileUrl: string; uploadedAt: string; category?: string | null }[];
+  // Resumen completo (no solo pendientes, a diferencia de PortalOrderSummary)
+  // de las cotizaciones nacidas de esta orden.
+  quotations: Omit<PortalQuotationSummary, "sourceOrder">[];
   diagnostics: {
     id: number;
     createdAt: string;

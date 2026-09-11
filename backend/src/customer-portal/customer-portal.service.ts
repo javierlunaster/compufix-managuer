@@ -61,6 +61,14 @@ export class CustomerPortalService {
             deviceType: { select: { name: true } },
           },
         },
+        // Solo el conteo de lo que de verdad necesita su atención — para
+        // que "tienes una cotización esperando respuesta" se note desde la
+        // lista, sin tener que entrar a cada orden ni cruzarla a mano con
+        // "Mis cotizaciones".
+        quotations: {
+          where: { status: { in: [QuotationStatus.SENT, QuotationStatus.PENDING] } },
+          select: { id: true },
+        },
       },
       orderBy: { entryDate: "desc" },
     });
@@ -162,9 +170,26 @@ export class CustomerPortalService {
           select: { id: true, coverageDescription: true, warrantyEndDate: true, status: true },
           orderBy: { deliveryDate: "desc" },
         },
+        // Cotizaciones nacidas de ESTA orden — antes solo se veían en "Mis
+        // cotizaciones", una sección aparte que el cliente tenía que saber
+        // que existía. Mostrarlas aquí también deja que las ubique justo
+        // donde las busca primero: dentro de la reparación a la que
+        // pertenecen. El detalle completo (ítems, aprobar/rechazar) sigue
+        // viviendo en /portal/quotations/:id — aquí solo el resumen.
+        quotations: {
+          select: {
+            id: true,
+            quotationNumber: true,
+            date: true,
+            status: true,
+            total: true,
+            validUntil: true,
+          },
+          orderBy: { date: "desc" },
+        },
         // NUNCA se seleccionan: devicePasswordEncrypted, notes (notas
-        // internas del técnico sobre la orden), cotizaciones, ni ningún
-        // dato de costo/margen.
+        // internas del técnico sobre la orden), ni ningún dato de
+        // costo/margen.
       },
     });
 
