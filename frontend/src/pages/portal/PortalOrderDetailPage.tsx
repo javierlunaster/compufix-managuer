@@ -95,6 +95,135 @@ export function PortalOrderDetailPage() {
         </dl>
       </Card>
 
+      {order.diagnostics.length > 0 && (
+        <Card>
+          <CardHeader title="Diagnóstico" subtitle="Qué encontramos y qué se hizo" />
+          <div className="divide-y divide-border">
+            {order.diagnostics.map((d) => (
+              <div key={d.id} className="space-y-2 p-4 text-sm">
+                <p className="text-xs text-ink-muted">
+                  {formatDate(d.createdAt)}
+                  {d.technician ? ` · ${d.technician.fullName}` : ""}
+                </p>
+                {d.initialSymptom && (
+                  <p>
+                    <span className="text-ink-muted">Síntoma inicial: </span>
+                    <span className="text-ink">{d.initialSymptom}</span>
+                  </p>
+                )}
+                {d.componentSuspected && (
+                  <p>
+                    <span className="text-ink-muted">Componente sospechoso: </span>
+                    <span className="text-ink">{d.componentSuspected}</span>
+                  </p>
+                )}
+                {d.componentReplaced && (
+                  <p>
+                    <span className="text-ink-muted">Componente reemplazado: </span>
+                    <span className="text-ink">{d.componentReplaced}</span>
+                  </p>
+                )}
+                {d.result && (
+                  <p>
+                    <span className="text-ink-muted">Resultado: </span>
+                    <span className="text-ink">{d.result}</span>
+                  </p>
+                )}
+
+                {d.measurements.length > 0 && (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-ink-muted">
+                        <th className="py-1 pr-2">Punto</th>
+                        <th className="py-1 pr-2">Esperado</th>
+                        <th className="py-1 pr-2">Medido</th>
+                        <th className="py-1">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.measurements.map((m) => (
+                        <tr key={m.id} className="border-t border-border">
+                          <td className="py-1 pr-2 text-ink">{m.pointName}</td>
+                          <td className="py-1 pr-2 tabular text-ink-muted">{m.expectedValue ?? "—"}</td>
+                          <td className="py-1 pr-2 tabular text-ink-muted">
+                            {m.measuredValue ?? "—"}
+                            {m.unit ? ` ${m.unit}` : ""}
+                          </td>
+                          <td className="py-1 text-ink-muted">{m.status ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {d.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {d.photos.map((p) => (
+                      <a key={p.id} href={resolvePhotoUrl(p.fileUrl)} target="_blank" rel="noreferrer">
+                        <img
+                          src={resolvePhotoUrl(p.fileUrl)}
+                          alt="Evidencia del diagnóstico"
+                          className="h-16 w-16 rounded border border-border object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {order.logs.length > 0 && (
+        <Card>
+          <CardHeader title="Bitácora de reparación" subtitle="Avance del trabajo sobre tu equipo" />
+          <div className="divide-y divide-border">
+            {order.logs.map((l) => (
+              <div key={l.id} className="space-y-1 p-4 text-sm">
+                <p className="text-xs text-ink-muted">
+                  {formatDate(l.date)}
+                  {l.technician ? ` · ${l.technician.fullName}` : ""}
+                </p>
+                {l.procedure && <p className="text-ink">{l.procedure}</p>}
+                {(l.component || l.reference) && (
+                  <p className="text-xs text-ink-muted">
+                    {[l.component, l.reference].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                {l.measurement && (
+                  <p>
+                    <span className="text-ink-muted">Medición: </span>
+                    <span className="text-ink">{l.measurement}</span>
+                  </p>
+                )}
+                {l.result && (
+                  <p>
+                    <span className="text-ink-muted">Resultado: </span>
+                    <span className="text-ink">{l.result}</span>
+                  </p>
+                )}
+                {l.notes && <p className="text-ink-muted">{l.notes}</p>}
+
+                {l.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {l.photos.map((p) => (
+                      <a key={p.id} href={resolvePhotoUrl(p.fileUrl)} target="_blank" rel="noreferrer">
+                        <img
+                          src={resolvePhotoUrl(p.fileUrl)}
+                          alt="Evidencia de la bitácora"
+                          className="h-16 w-16 rounded border border-border object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {intakePhotos.length > 0 && (
         <Card>
           <CardHeader title="Estado de ingreso" subtitle="Cómo llegó tu equipo al taller" />

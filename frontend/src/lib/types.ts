@@ -557,6 +557,36 @@ export type PortalOrderDetail = PortalOrderSummary & {
   mouseReceived: boolean;
   device: PortalOrderSummary["device"] & { serialNumber?: string | null };
   photos: { id: number; fileUrl: string; uploadedAt: string; category?: string | null }[];
+  diagnostics: {
+    id: number;
+    createdAt: string;
+    initialSymptom?: string | null;
+    componentSuspected?: string | null;
+    componentReplaced?: string | null;
+    result?: string | null;
+    technician?: { fullName: string } | null;
+    measurements: {
+      id: number;
+      pointName: string;
+      expectedValue?: string | null;
+      measuredValue?: string | null;
+      unit?: string | null;
+      status?: string | null;
+    }[];
+    photos: { id: number; fileUrl: string; uploadedAt: string }[];
+  }[];
+  logs: {
+    id: number;
+    date: string;
+    procedure?: string | null;
+    measurement?: string | null;
+    component?: string | null;
+    reference?: string | null;
+    result?: string | null;
+    notes?: string | null;
+    technician?: { fullName: string } | null;
+    photos: { id: number; fileUrl: string; uploadedAt: string }[];
+  }[];
   payments: { id: number; date: string; amount: string; method: string }[];
   warranties: {
     id: number;

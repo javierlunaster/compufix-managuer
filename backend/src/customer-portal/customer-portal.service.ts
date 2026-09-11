@@ -92,13 +92,65 @@ export class CustomerPortalService {
             deviceType: { select: { name: true } },
           },
         },
-        // Solo fotos generales de la orden (repairLogId null) — nunca las
-        // de una entrada de bitácora puntual, que pueden documentar un
-        // hallazgo técnico interno no pensado para el cliente.
+        // Fotos generales de la orden — ni de una entrada de bitácora ni de
+        // un diagnóstico puntual, esas se muestran junto a su propia
+        // entrada de diagnóstico/bitácora más abajo, no aquí.
         photos: {
-          where: { repairLogId: null },
+          where: { repairLogId: null, diagnosticId: null },
           select: { id: true, fileUrl: true, uploadedAt: true, category: true },
           orderBy: { uploadedAt: "desc" },
+        },
+        // El diagnóstico y la bitácora SÍ se muestran al cliente (a
+        // diferencia de las notas internas del técnico en RepairOrder.notes,
+        // que siguen sin exponerse): explican qué se encontró y qué se hizo,
+        // la misma información que ya recibe impresa en el informe técnico
+        // (ver documents.service.ts). Se deja fuera boardReference/chargerIc
+        // (referencias de repuesto, sin valor informativo para el cliente) y
+        // las banderas booleanas de checklist interno (biosReprogrammed,
+        // ecReviewed, ecReprogrammed).
+        diagnostics: {
+          select: {
+            id: true,
+            createdAt: true,
+            initialSymptom: true,
+            componentSuspected: true,
+            componentReplaced: true,
+            result: true,
+            technician: { select: { fullName: true } },
+            measurements: {
+              select: {
+                id: true,
+                pointName: true,
+                expectedValue: true,
+                measuredValue: true,
+                unit: true,
+                status: true,
+              },
+            },
+            photos: {
+              select: { id: true, fileUrl: true, uploadedAt: true },
+              orderBy: { uploadedAt: "asc" },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        logs: {
+          select: {
+            id: true,
+            date: true,
+            procedure: true,
+            measurement: true,
+            component: true,
+            reference: true,
+            result: true,
+            notes: true,
+            technician: { select: { fullName: true } },
+            photos: {
+              select: { id: true, fileUrl: true, uploadedAt: true },
+              orderBy: { uploadedAt: "asc" },
+            },
+          },
+          orderBy: { date: "asc" },
         },
         payments: {
           select: { id: true, date: true, amount: true, method: true },
@@ -109,8 +161,8 @@ export class CustomerPortalService {
           orderBy: { deliveryDate: "desc" },
         },
         // NUNCA se seleccionan: devicePasswordEncrypted, notes (notas
-        // internas del técnico), logs/diagnostics (bitácora técnica
-        // interna), cotizaciones, ni ningún dato de costo/margen.
+        // internas del técnico sobre la orden), cotizaciones, ni ningún
+        // dato de costo/margen.
       },
     });
 
