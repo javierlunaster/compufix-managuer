@@ -5,7 +5,7 @@ import type { RepairOrderListItem, RepairStatus } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { Button, Card, EmptyState, ErrorBanner, Input, Select, Spinner } from "@/components/ui";
-import { formatDate } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 export function RepairOrdersPage() {
   const [params, setParams] = useSearchParams();
@@ -96,7 +96,10 @@ export function RepairOrdersPage() {
                   </td>
                   <td className="px-4 py-3 tabular text-ink-muted">{formatDate(o.entryDate)}</td>
                   <td className="px-4 py-3">
-                    <StatusPill status={o.status} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill status={o.status} />
+                      <BalancePill totalValue={o.totalValue} paidAmount={o.paidAmount} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -105,5 +108,21 @@ export function RepairOrdersPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Aviso rápido de saldo pendiente junto al estado — antes había que entrar
+ * a cada orden para saber si ya estaba paga. Solo se muestra cuando hay
+ * saldo real (evita ruido en las que ya están saldadas o entregadas).
+ */
+function BalancePill({ totalValue, paidAmount }: { totalValue: string; paidAmount: string }) {
+  const balance = Number(totalValue) - Number(paidAmount);
+  if (balance <= 0) return null;
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2.5 py-1 font-mono text-xs text-danger">
+      Saldo {formatCurrency(balance)}
+    </span>
   );
 }

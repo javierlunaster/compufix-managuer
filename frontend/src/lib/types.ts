@@ -109,6 +109,8 @@ export type RepairOrderListItem = {
   orderCode: string;
   status: RepairStatus;
   entryDate: string;
+  totalValue: string;
+  paidAmount: string;
   customer: { id: number; fullName: string; phone?: string | null };
   device: { id: number; model?: string | null; serialNumber?: string | null };
   technician?: { id: number; fullName: string } | null;
