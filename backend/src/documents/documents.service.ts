@@ -15,6 +15,36 @@ export class DocumentsService {
   ) {}
 
   /**
+   * `Attachment.fileUrl` es una URL pública de Supabase Storage (no una
+   * ruta en disco — el filesystem del contenedor es efímero, ver
+   * storage.service.ts), así que para imprimirla dentro de un PDF hay que
+   * descargarla primero como Buffer; pdfkit's `.image()` acepta un Buffer
+   * igual que una ruta de archivo. Un `null` de vuelta (descarga fallida,
+   * URL caída) cae en el aviso de "no disponible para impresión" que ya
+   * maneja PdfBuilder.photoGrid.
+   */
+  private async fetchPhotoBuffer(fileUrl: string): Promise<Buffer | null> {
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) return null;
+      return Buffer.from(await response.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  private async buildPhotoGridEntries(
+    photos: { fileUrl: string; uploadedAt: Date }[],
+  ): Promise<{ path: Buffer | null; caption: string }[]> {
+    return Promise.all(
+      photos.map(async (p) => ({
+        path: await this.fetchPhotoBuffer(p.fileUrl),
+        caption: formatDate(p.uploadedAt),
+      })),
+    );
+  }
+
+  /**
    * El botón "GENERAR INFORME TÉCNICO" de la sección 24 del brief. Reutiliza
    * RepairOrdersService.findOne() —el mismo expediente técnico que ya arma
    * el backend desde la Fase 4 en adelante— en vez de escribir de nuevo las
@@ -70,6 +100,16 @@ export class DocumentsService {
           );
         }
         if (d.result) pdf.paragraph(`Resultado del diagnóstico: ${d.result}`);
+
+        // Las fotos subidas desde la pestaña Diagnóstico ("trabajo
+        // realizado y estado final") nunca se estaban incluyendo aquí —
+        // solo las de las dos galerías de la pestaña Información
+        // (estado de ingreso/entrega). Se agregan junto a su propio
+        // diagnóstico, no en una sección aparte, porque documentan
+        // específicamente ese paso técnico.
+        if (d.photos.length > 0) {
+          pdf.photoGrid(await this.buildPhotoGridEntries(d.photos));
+        }
       }
     }
 
@@ -92,15 +132,34 @@ export class DocumentsService {
 
     // El schema no tiene un campo dedicado de "recomendaciones" (sección 24
     // del brief lo pide, pero no se modeló como columna propia — ver README
-    // de esta fase). Se usa el resultado del último diagnóstico y las notas
-    // generales de la orden como la aproximación más honesta disponible.
-    const lastDiagnostic = order.diagnostics[0];
+    // de esta fase). Antes esta sección repetía el resultado del último
+    // diagnóstico, que YA se imprime arriba dentro de "Diagnóstico" — el
+    // mismo párrafo aparecía dos veces con encabezados distintos. Ahora
+    // solo muestra las notas generales de la orden (Editar información →
+    // "Notas generales"), que es información realmente distinta al
+    // resultado técnico del diagnóstico.
     pdf
-      .sectionTitle("Resultado y recomendaciones")
-      .paragraph(
-        [lastDiagnostic?.result, order.notes].filter(Boolean).join(" — ") ||
-          "Sin observaciones adicionales.",
-      );
+      .sectionTitle("Recomendaciones y notas generales")
+      .paragraph(order.notes || "Sin observaciones adicionales.");
+
+    // Evidencia fotográfica: separada en dos momentos distintos porque
+    // responde a la pregunta que motivó esta sección — dejar constancia
+    // de en qué estado llegó el equipo (protege al taller de un reclamo
+    // por un daño previo) y en qué estado se entrega (protege al cliente,
+    // confirma que el trabajo se hizo). "equipo_recibido" y sin categoría
+    // (fotos subidas antes de esta separación) cuentan como ingreso.
+    const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+    const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
+
+    if (intakePhotos.length > 0) {
+      pdf.sectionTitle("Evidencia fotográfica — estado de ingreso");
+      pdf.photoGrid(await this.buildPhotoGridEntries(intakePhotos));
+    }
+
+    if (deliveryPhotos.length > 0) {
+      pdf.sectionTitle("Evidencia fotográfica — estado de entrega");
+      pdf.photoGrid(await this.buildPhotoGridEntries(deliveryPhotos));
+    }
 
     pdf.sectionTitle("Garantía");
     if (order.warranties.length > 0) {

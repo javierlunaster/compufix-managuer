@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Patch, Post, Body, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseIntPipe, Post, Body, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { Public } from "../common/decorators/public.decorator";
 import { CustomerPortalService } from "./customer-portal.service";
@@ -45,20 +45,35 @@ export class CustomerPortalController {
   }
 
   @UseGuards(CustomerJwtAuthGuard)
-  @Patch("quotations/:id/approve")
-  approveQuotation(
-    @CurrentCustomer() customer: AuthenticatedCustomer,
-    @Param("id", ParseIntPipe) quotationId: number,
-  ) {
-    return this.customerPortalService.respondToQuotation(customer.id, quotationId, true);
+  @Get("my-quotations")
+  findMyQuotations(@CurrentCustomer() customer: AuthenticatedCustomer) {
+    return this.customerPortalService.findMyQuotations(customer.id);
   }
 
   @UseGuards(CustomerJwtAuthGuard)
-  @Patch("quotations/:id/reject")
-  rejectQuotation(
+  @Get("my-quotations/:id")
+  findMyQuotationDetail(
     @CurrentCustomer() customer: AuthenticatedCustomer,
     @Param("id", ParseIntPipe) quotationId: number,
   ) {
-    return this.customerPortalService.respondToQuotation(customer.id, quotationId, false);
+    return this.customerPortalService.findMyQuotationDetail(customer.id, quotationId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotations/:id/approve")
+  approveMyQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.approveMyQuotation(customer.id, quotationId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotations/:id/reject")
+  rejectMyQuotation(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) quotationId: number,
+  ) {
+    return this.customerPortalService.rejectMyQuotation(customer.id, quotationId);
   }
 }

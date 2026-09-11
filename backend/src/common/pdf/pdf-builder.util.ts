@@ -199,6 +199,85 @@ export class PdfBuilder {
     return this;
   }
 
+  /**
+   * Cuadrícula de fotos (evidencia de ingreso/entrega, Fase 15+). Procesa
+   * fila por fila: revisa ANTES de dibujar cada fila si cabe en lo que
+   * queda de página (this.doc.y + rowHeight), y si no, salta de página —
+   * mismo criterio que ya usan table()/keyValueGrid() para no dejar una
+   * fila de fotos partida entre dos páginas.
+   *
+   * `path` acepta un Buffer además de una ruta de archivo: desde que las
+   * fotos viven en Supabase Storage (no en disco local), quien llama a
+   * este método ya descargó el binario por HTTP y lo pasa como Buffer —
+   * pdfkit's `.image()` acepta ambas formas de la misma manera. Un Buffer
+   * ausente (descarga fallida) se trata igual que un archivo no
+   * encontrado: cae en el mismo aviso de "no disponible para impresión".
+   *
+   * Los formatos WEBP/GIF (permitidos al subir, ver attachments/
+   * multer.config.ts) no los decodifica PDFKit — si `doc.image()` falla
+   * por el motivo que sea (formato no soportado, archivo dañado, archivo
+   * que ya no existe en disco), la celda se reemplaza por un aviso de
+   * texto en vez de romper la generación de todo el documento.
+   */
+  photoGrid(photos: { path: string | Buffer | null; caption?: string }[], columns = 3) {
+    if (photos.length === 0) return this;
+
+    const usableWidth = this.doc.page.width - 100;
+    const gap = 10;
+    const cellWidth = (usableWidth - gap * (columns - 1)) / columns;
+    const cellHeight = cellWidth * 0.75; // 4:3 — suficiente para reconocer el equipo sin ocupar media página
+    const captionHeight = 12;
+    const rowHeight = cellHeight + captionHeight + 8;
+
+    for (let i = 0; i < photos.length; i += columns) {
+      if (this.doc.y + rowHeight > this.doc.page.height - 60) {
+        this.doc.addPage();
+      }
+      const rowY = this.doc.y;
+      const row = photos.slice(i, i + columns);
+
+      row.forEach((photo, col) => {
+        const x = 50 + col * (cellWidth + gap);
+
+        this.doc.rect(x, rowY, cellWidth, cellHeight).strokeColor("#d1d5db").stroke();
+
+        try {
+          if (!photo.path) {
+            throw new Error("Imagen no disponible");
+          }
+          this.doc.image(photo.path, x, rowY, {
+            fit: [cellWidth, cellHeight],
+            align: "center",
+            valign: "center",
+          });
+        } catch {
+          this.doc
+            .fontSize(7)
+            .fillColor("#9ca3af")
+            .text("Imagen no disponible para impresión", x + 4, rowY + cellHeight / 2 - 6, {
+              width: cellWidth - 8,
+              align: "center",
+            });
+        }
+
+        if (photo.caption) {
+          this.doc
+            .fontSize(7)
+            .fillColor("#6b7280")
+            .text(sanitizeForPdf(photo.caption), x, rowY + cellHeight + 2, {
+              width: cellWidth,
+              align: "center",
+            });
+        }
+      });
+
+      this.doc.y = rowY + rowHeight;
+    }
+
+    this.doc.x = this.doc.page.margins.left;
+    return this;
+  }
+
   signatureLine(label: string) {
     const y = this.doc.y + 30;
     this.doc

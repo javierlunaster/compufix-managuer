@@ -528,28 +528,22 @@ export type PortalOrderSummary = {
   };
 };
 
-export type PortalQuotationItem = {
-  id: number;
-  type: QuotationItemType;
-  description: string;
-  quantity: number;
-  unitPrice: string;
-  subtotal: string;
-};
-
-export type PortalQuotation = {
+export type PortalQuotationSummary = {
   id: number;
   quotationNumber: string;
   date: string;
   status: QuotationStatus;
+  total: string;
+  validUntil?: string | null;
+  sourceOrder?: { id: number; orderCode: string } | null;
+};
+
+export type PortalQuotationDetail = PortalQuotationSummary & {
   subtotal: string;
   discount: string;
   tax: string;
   shipping: string;
-  total: string;
-  validUntil?: string | null;
-  notes?: string | null;
-  items: PortalQuotationItem[];
+  items: { id: number; description: string; quantity: number; unitPrice: string; subtotal: string }[];
 };
 
 export type PortalOrderDetail = PortalOrderSummary & {
@@ -560,7 +554,7 @@ export type PortalOrderDetail = PortalOrderSummary & {
   keyboardReceived: boolean;
   mouseReceived: boolean;
   device: PortalOrderSummary["device"] & { serialNumber?: string | null };
-  photos: { id: number; fileUrl: string; uploadedAt: string }[];
+  photos: { id: number; fileUrl: string; uploadedAt: string; category?: string | null }[];
   payments: { id: number; date: string; amount: string; method: string }[];
   warranties: {
     id: number;
@@ -568,5 +562,4 @@ export type PortalOrderDetail = PortalOrderSummary & {
     warrantyEndDate: string;
     status: WarrantyStatus;
   }[];
-  quotations: PortalQuotation[];
 };

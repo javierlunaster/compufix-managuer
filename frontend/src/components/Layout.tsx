@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/sales", label: "Ventas", icon: CartIcon },
   { to: "/purchases", label: "Compras", icon: TruckIcon },
   { to: "/cash", label: "Caja", icon: CashIcon },
+  { to: "/finance", label: "Finanzas", icon: ChartIcon, roles: ["Administrador", "Gerente"] },
   // El backend restringe toda la gestión de usuarios a Administrador
   // (Fase 2) — mostrar este ítem a otros roles solo llevaría a una
   // pantalla que va a fallar con 403 en cada llamada.
@@ -267,6 +268,14 @@ function CashIcon({ className }: { className?: string }) {
       <rect x="2" y="6" width="20" height="12" rx="2" />
       <circle cx="12" cy="12" r="3" />
       <path d="M6 6v0M18 18v0" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M4 20V10M12 20V4M20 20v-7" />
     </svg>
   );
 }

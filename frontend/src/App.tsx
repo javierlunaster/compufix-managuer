@@ -8,6 +8,8 @@ import { LoginPage } from "@/pages/LoginPage";
 import { PortalLoginPage } from "@/pages/portal/PortalLoginPage";
 import { PortalOrdersPage } from "@/pages/portal/PortalOrdersPage";
 import { PortalOrderDetailPage } from "@/pages/portal/PortalOrderDetailPage";
+import { PortalQuotationsPage } from "@/pages/portal/PortalQuotationsPage";
+import { PortalQuotationDetailPage } from "@/pages/portal/PortalQuotationDetailPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { CustomerDetailPage } from "@/pages/CustomerDetailPage";
@@ -34,6 +36,7 @@ import { UserDetailPage } from "@/pages/UserDetailPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
 import { LandingPage } from "@/pages/LandingPage";
+import { FinancePage } from "@/pages/FinancePage";
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -99,8 +102,25 @@ function AppRoutes() {
           </PortalProtectedLayout>
         }
       />
+      <Route
+        path="/portal/quotations"
+        element={
+          <PortalProtectedLayout>
+            <PortalQuotationsPage />
+          </PortalProtectedLayout>
+        }
+      />
+      <Route
+        path="/portal/quotations/:id"
+        element={
+          <PortalProtectedLayout>
+            <PortalQuotationDetailPage />
+          </PortalProtectedLayout>
+        }
+      />
 
       <Route path="/" element={<HomeGate />} />
+      <Route path="/finance" element={<ProtectedLayout><FinancePage /></ProtectedLayout>} />
       <Route path="/customers" element={<ProtectedLayout><CustomersPage /></ProtectedLayout>} />
       <Route path="/customers/:id" element={<ProtectedLayout><CustomerDetailPage /></ProtectedLayout>} />
       <Route path="/repair-orders" element={<ProtectedLayout><RepairOrdersPage /></ProtectedLayout>} />

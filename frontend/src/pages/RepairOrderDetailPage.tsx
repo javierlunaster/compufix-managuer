@@ -204,6 +204,8 @@ function Money({ label, value, emphasize }: { label: string; value: string; emph
 
 function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
+  const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
+  const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
 
   if (editing) {
     return (
@@ -269,14 +271,30 @@ function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: ()
 
       <Card>
         <CardHeader
-          title="Fotos del equipo"
-          subtitle="Evidencia del estado físico al recibirlo — protege al taller y al cliente ante cualquier reclamo"
+          title="Fotos: estado de ingreso"
+          subtitle="Evidencia de cómo llegó el equipo — protege al taller y al cliente ante cualquier reclamo"
         />
         <div className="p-4">
           <PhotoGallery
-            photos={order.photos}
+            photos={intakePhotos}
             uploadUrl={`/repair-orders/${order.id}/photos`}
             onChanged={onChanged}
+            category="equipo_recibido"
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Fotos: estado de entrega"
+          subtitle="Cómo queda el equipo al terminar — se incluyen en el informe técnico impreso"
+        />
+        <div className="p-4">
+          <PhotoGallery
+            photos={deliveryPhotos}
+            uploadUrl={`/repair-orders/${order.id}/photos`}
+            onChanged={onChanged}
+            category="resultado_final"
           />
         </div>
       </Card>
