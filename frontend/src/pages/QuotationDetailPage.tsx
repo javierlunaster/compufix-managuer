@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { Product, QuotationDetail, QuotationStatus, Service } from "@/lib/types";
@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 
 export function QuotationDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const {
     data: quotation,
     loading,
@@ -28,6 +29,7 @@ export function QuotationDetailPage() {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   if (loading) {
     return (
@@ -101,6 +103,18 @@ export function QuotationDetailPage() {
     }
   }
 
+  async function handleRemove() {
+    setActionError(null);
+    setBusy(true);
+    try {
+      await api.delete(`/quotations/${quotation!.id}`);
+      navigate(quotation!.sourceOrder ? `/repair-orders/${quotation!.sourceOrder.id}` : "/quotations");
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo retirar la cotización");
+      setBusy(false);
+    }
+  }
+
   async function removeItem(itemId: number) {
     setActionError(null);
     try {
@@ -163,6 +177,26 @@ export function QuotationDetailPage() {
                 Convertir en reparación
               </Button>
             )}
+            {quotation.status !== "CONVERTED" &&
+              (confirmingRemove ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-ink-muted">¿Retirar esta cotización?</span>
+                  <Button variant="danger" disabled={busy} onClick={handleRemove}>
+                    {busy ? "Retirando…" : "Sí, retirar"}
+                  </Button>
+                  <Button variant="ghost" disabled={busy} onClick={() => setConfirmingRemove(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(true)}
+                  className="text-xs text-danger hover:underline"
+                >
+                  Retirar cotización
+                </button>
+              ))}
           </div>
         </div>
 

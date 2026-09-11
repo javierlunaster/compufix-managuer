@@ -281,6 +281,46 @@ export class QuotationsService {
     });
   }
 
+  /**
+   * "Retirar" una cotización de la orden — un descarte real (se elimina el
+   * registro, no solo se desvincula), pensado para cotizaciones que se
+   * armaron por error o que el cliente nunca va a aprobar. Nunca se permite
+   * sobre una CONVERTED: sus repuestos y servicios ya quedaron creados de
+   * verdad en la orden (RepairPart/RepairService, con su descuento de
+   * inventario ya aplicado) y su total ya se sumó a order.totalValue —
+   * borrar el registro de la cotización dejaría esos movimientos sin
+   * explicación, sin revertir nada de lo que ya ocurrió.
+   */
+  async remove(id: number, actingUserId: number) {
+    const quotation = await this.prisma.customerQuotation.findUnique({ where: { id } });
+    if (!quotation) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (quotation.status === QuotationStatus.CONVERTED) {
+      throw new BadRequestException(
+        "Esta cotización ya fue convertida en una orden de reparación — sus repuestos y servicios ya quedaron registrados, así que no se puede retirar.",
+      );
+    }
+
+    // quotation_items tiene ON DELETE RESTRICT hacia customer_quotations
+    // (a propósito, para no perder un ítem por accidente en un delete en
+    // cascada) — hay que borrar los ítems primero, en la misma transacción.
+    await this.prisma.$transaction([
+      this.prisma.quotationItem.deleteMany({ where: { quotationId: id } }),
+      this.prisma.customerQuotation.delete({ where: { id } }),
+    ]);
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "DELETE",
+      entityType: "CustomerQuotation",
+      entityId: id,
+      previousValue: { quotationNumber: quotation.quotationNumber, status: quotation.status },
+    });
+
+    return { message: "Cotización retirada" };
+  }
+
   async updateStatus(id: number, dto: UpdateQuotationStatusDto, actingUserId: number) {
     const quotation = await this.prisma.customerQuotation.findUnique({ where: { id } });
     if (!quotation) {
@@ -377,9 +417,14 @@ export class QuotationsService {
         // order.totalValue. Ver nota de simplificación en el README.
       }
 
+      // Se SUMA al total existente, nunca se reemplaza: una orden puede
+      // acumular varias cotizaciones convertidas a lo largo del tiempo (ej.
+      // un hallazgo adicional durante la reparación) o ya tener un
+      // totalValue puesto a mano al recibir el equipo — sobrescribirlo
+      // borraba silenciosamente ese valor previo.
       await tx.repairOrder.update({
         where: { id: orderId },
-        data: { totalValue: quotation.total, status: RepairStatus.APPROVED },
+        data: { totalValue: { increment: quotation.total }, status: RepairStatus.APPROVED },
       });
 
       await tx.repairStatusHistory.create({

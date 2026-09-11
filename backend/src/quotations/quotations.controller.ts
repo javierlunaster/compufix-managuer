@@ -81,6 +81,11 @@ export class QuotationsController {
     return this.quotationsService.removeItem(id, itemId, actingUser.id);
   }
 
+  @Delete(":id")
+  remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() actingUser: AuthenticatedUser) {
+    return this.quotationsService.remove(id, actingUser.id);
+  }
+
   @Post(":id/convert")
   convert(
     @Param("id", ParseIntPipe) id: number,

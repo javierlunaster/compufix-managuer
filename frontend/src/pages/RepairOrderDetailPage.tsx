@@ -77,7 +77,7 @@ export function RepairOrderDetailPage() {
       {tab === "Diagnóstico" && <DiagnosticsTab order={order} onChanged={reload} />}
       {tab === "Bitácora" && <LogsTab order={order} onChanged={reload} />}
       {tab === "Repuestos" && <PartsTab order={order} onChanged={reload} />}
-      {tab === "Cotizaciones" && <QuotationsTab order={order} />}
+      {tab === "Cotizaciones" && <QuotationsTab order={order} onChanged={reload} />}
       {tab === "Garantía" && <WarrantyTab order={order} onChanged={reload} />}
       {tab === "Pagos" && <PaymentsTab order={order} onChanged={reload} />}
       {tab === "Historial" && <HistoryTab order={order} />}
@@ -1609,14 +1609,43 @@ function NewWarrantyForm({
 
 // --- Pestaña: Cotizaciones ---------------------------------------------
 
-function QuotationsTab({ order }: { order: RepairOrderDetail }) {
+function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRemove(quotationId: number) {
+    setError(null);
+    try {
+      await api.delete(`/quotations/${quotationId}`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo retirar la cotización");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  const convertedTotal = order.quotations
+    .filter((q) => q.status === "CONVERTED")
+    .reduce((sum, q) => sum + Number(q.total), 0);
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        {convertedTotal > 0 ? (
+          <p className="text-sm text-ink-muted">
+            Convertidas (sumadas al total de la orden):{" "}
+            <span className="font-mono tabular text-ink">{formatCurrency(convertedTotal)}</span>
+          </p>
+        ) : (
+          <span />
+        )}
         <Link to={`/quotations/new?customerId=${order.customer.id}&sourceOrderId=${order.id}`}>
           <Button variant="primary">+ Nueva cotización</Button>
         </Link>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       {order.quotations.length === 0 ? (
         <Card>
@@ -1626,15 +1655,42 @@ function QuotationsTab({ order }: { order: RepairOrderDetail }) {
         <Card>
           <ul className="divide-y divide-border">
             {order.quotations.map((q) => (
-              <li key={q.id}>
-                <Link
-                  to={`/quotations/${q.id}`}
-                  className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-raised"
-                >
+              <li key={q.id} className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-raised">
+                <Link to={`/quotations/${q.id}`} className="flex flex-1 items-center justify-between gap-4">
                   <span className="font-mono text-accent">{q.quotationNumber}</span>
                   <span className="text-ink-muted">{q.status}</span>
                   <span className="tabular text-ink">{formatCurrency(q.total)}</span>
                 </Link>
+                {q.status !== "CONVERTED" && (
+                  <div className="ml-4 shrink-0">
+                    {removingId === q.id ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(q.id)}
+                          className="text-xs text-danger hover:underline"
+                        >
+                          Confirmar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRemovingId(null)}
+                          className="text-xs text-ink-muted hover:underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setRemovingId(q.id)}
+                        className="text-xs text-ink-muted hover:text-danger hover:underline"
+                      >
+                        Retirar
+                      </button>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
