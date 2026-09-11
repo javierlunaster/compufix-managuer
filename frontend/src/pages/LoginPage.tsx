@@ -30,11 +30,12 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded bg-accent/15 font-mono text-lg font-semibold text-accent">
-            CF
+          {/* Tarjeta blanca: el logo trae texto negro sin fondo propio,
+              sobre este fondo oscuro se volvería casi invisible. */}
+          <div className="inline-flex items-center rounded-lg bg-white px-4 py-2 shadow-sm">
+            <img src="/logo.png" alt="CompuFix Soluciones Integrales" className="h-10 w-auto" />
           </div>
           <div className="text-center">
-            <h1 className="text-lg font-semibold text-ink">COMPufix Manager</h1>
             <p className="text-sm text-ink-muted">Sistema del taller</p>
           </div>
         </div>

@@ -22,10 +22,10 @@ export function LandingPage() {
       <header className="site">
         <div className="wrap header-row">
           <div className="brand">
-            <span className="brand-name">
-              Compu<span className="accent-dot">Fix</span>
+            <span className="brand-logo">
+              <img src="/logo.png" alt="CompuFix Soluciones Integrales" />
             </span>
-            <span className="brand-tag">Soluciones Integrales · Cartagena</span>
+            <span className="brand-tag">Cartagena, Bolívar</span>
           </div>
           <div className="header-actions">
             <a className="phone-readout" href="tel:+573013951619">

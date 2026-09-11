@@ -71,12 +71,14 @@ export function Layout({ children }: { children: ReactNode }) {
           mobileNavOpen ? "translate-x-0" : ""
         }`}
       >
-        <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded bg-accent/15 font-mono text-sm font-semibold text-accent">
-            CF
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          {/* El logo trae texto negro sin fondo propio — sobre el fondo
+              oscuro del panel se volvería casi invisible, por eso va en
+              una tarjeta blanca a modo de placa. */}
+          <div className="flex items-center rounded bg-white px-2 py-1 shadow-sm">
+            <img src="/logo.png" alt="CompuFix" className="h-7 w-auto" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold leading-none">COMPufix</p>
             <p className="text-xs text-ink-muted">Manager</p>
           </div>
           <button

@@ -73,16 +73,26 @@
 .landing-page .brand {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
-.landing-page .brand-name {
-  font-family: "IBM Plex Sans", sans-serif;
-  font-weight: 700;
-  font-size: 1.28rem;
-  letter-spacing: -0.01em;
+/* El logo trae texto negro sin fondo propio (solo un contorno delgado) —
+   sobre el fondo oscuro del sitio se volvería casi invisible, así que va
+   en una tarjeta blanca a modo de placa, igual que se resuelve en el
+   panel lateral y en el portal del cliente. */
+.landing-page .brand-logo {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 12px;
+  line-height: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  width: fit-content;
 }
-.landing-page .brand-name .accent-dot {
-  color: var(--accent-strong);
+.landing-page .brand-logo img {
+  display: block;
+  height: 30px;
+  width: auto;
 }
 .landing-page .brand-tag {
   font-family: "IBM Plex Mono", monospace;

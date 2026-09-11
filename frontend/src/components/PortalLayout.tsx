@@ -22,9 +22,11 @@ export function PortalProtectedLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-bg">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-6">
-          <p className="font-semibold tracking-wide text-ink">
-            COMP<span className="text-accent">ufix</span>
-          </p>
+          {/* Tarjeta blanca: el logo trae texto negro sin fondo propio, y
+              este encabezado (como el resto del portal) es oscuro. */}
+          <div className="flex items-center rounded bg-white px-2 py-1 shadow-sm">
+            <img src="/logo.png" alt="CompuFix" className="h-7 w-auto" />
+          </div>
           <nav className="flex gap-4 text-sm text-ink-muted">
             <Link to="/portal/orders" className="hover:text-accent">
               Mis reparaciones

@@ -29,9 +29,11 @@ export function PortalLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <p className="text-2xl font-semibold tracking-wide text-ink">
-            COMP<span className="text-accent">ufix</span>
-          </p>
+          {/* Tarjeta blanca: el logo trae texto negro sin fondo propio,
+              sobre este fondo oscuro se volvería casi invisible. */}
+          <div className="mx-auto mb-3 inline-flex items-center rounded-lg bg-white px-4 py-2 shadow-sm">
+            <img src="/logo.png" alt="CompuFix Soluciones Integrales" className="h-10 w-auto" />
+          </div>
           <p className="text-sm text-ink-muted">Consulta tus reparaciones</p>
         </div>
 
