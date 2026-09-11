@@ -112,4 +112,17 @@ export class RepairOrdersController {
   ) {
     return this.repairOrdersService.purgeDevicePassword(id, actingUser.id);
   }
+
+  // Corrección de datos (no un flujo normal): reemplaza totalValue por la
+  // suma de las cotizaciones convertidas de la orden — ver el docstring de
+  // recalculateTotal. Restringido igual que Finanzas porque toca un total
+  // financiero directamente, sin pasar por el flujo habitual (cotización).
+  @Post(":id/recalculate-total")
+  @Roles("Administrador", "Gerente")
+  recalculateTotal(
+    @Param("id", ParseIntPipe) id: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.repairOrdersService.recalculateTotal(id, actingUser.id);
+  }
 }

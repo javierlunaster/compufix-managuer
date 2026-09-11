@@ -1612,6 +1612,8 @@ function NewWarrantyForm({
 function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRecalc, setConfirmingRecalc] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   async function handleRemove(quotationId: number) {
     setError(null);
@@ -1625,9 +1627,28 @@ function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChang
     }
   }
 
-  const convertedTotal = order.quotations
-    .filter((q) => q.status === "CONVERTED")
-    .reduce((sum, q) => sum + Number(q.total), 0);
+  async function handleRecalculate() {
+    setError(null);
+    setRecalculating(true);
+    try {
+      await api.post(`/repair-orders/${order.id}/recalculate-total`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo recalcular el total");
+    } finally {
+      setRecalculating(false);
+      setConfirmingRecalc(false);
+    }
+  }
+
+  const convertedQuotations = order.quotations.filter((q) => q.status === "CONVERTED");
+  const convertedTotal = convertedQuotations.reduce((sum, q) => sum + Number(q.total), 0);
+  // Detecta órdenes con más de una cotización convertida antes de la
+  // corrección del bug que sobrescribía totalValue en vez de sumarlo —
+  // ahí el total registrado queda por debajo de lo que en realidad
+  // deberían sumar las cotizaciones convertidas.
+  const totalMismatch =
+    convertedQuotations.length > 0 && Math.abs(Number(order.totalValue) - convertedTotal) > 0.01;
 
   return (
     <div className="space-y-4">
@@ -1644,6 +1665,38 @@ function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChang
           <Button variant="primary">+ Nueva cotización</Button>
         </Link>
       </div>
+
+      {totalMismatch && (
+        <Card className="border-warning/40 bg-warning/10 p-4">
+          <p className="text-sm text-ink">
+            El total de la orden ({formatCurrency(order.totalValue)}) no coincide con la suma de sus
+            cotizaciones convertidas ({formatCurrency(convertedTotal)}). Esto pasa cuando se convirtió
+            más de una cotización antes de la corrección de este error.
+          </p>
+          {confirmingRecalc ? (
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-xs text-ink-muted">
+                Esto reemplaza el total actual por {formatCurrency(convertedTotal)}. Si el total
+                actual incluye algo fuera de estas cotizaciones, no lo uses.
+              </span>
+              <Button variant="danger" disabled={recalculating} onClick={handleRecalculate}>
+                {recalculating ? "Recalculando…" : "Sí, recalcular"}
+              </Button>
+              <Button variant="ghost" disabled={recalculating} onClick={() => setConfirmingRecalc(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              className="mt-3"
+              onClick={() => setConfirmingRecalc(true)}
+            >
+              Recalcular total desde cotizaciones convertidas
+            </Button>
+          )}
+        </Card>
+      )}
 
       {error && <ErrorBanner message={error} />}
 

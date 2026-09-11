@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, RepairStatus } from "@prisma/client";
+import { Prisma, QuotationStatus, RepairStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { encryptSecret, decryptSecret } from "../common/utils/encryption.util";
@@ -399,6 +399,44 @@ export class RepairOrdersService {
     });
 
     return { message: "Contraseña del equipo eliminada" };
+  }
+
+  /**
+   * Corrige órdenes afectadas por un bug ya corregido: convertir una
+   * cotización aprobada SOBRESCRIBÍA totalValue en vez de sumarlo (ver
+   * QuotationsService.convert), así que una orden con más de una
+   * cotización convertida antes de esa corrección quedó con el total de
+   * solo la última conversión. Se recalcula como la suma de TODAS las
+   * cotizaciones convertidas de la orden — es una acción explícita, no
+   * automática, porque si el total actual incluye algo fuera de una
+   * cotización (ej. una orden migrada del Excel con un valor propio) esto
+   * lo reemplazaría; el llamador (ver controller) debe confirmar con la
+   * persona antes de aplicarla.
+   */
+  async recalculateTotal(id: number, actingUserId: number) {
+    const order = await this.ensureExists(id);
+
+    const { _sum } = await this.prisma.customerQuotation.aggregate({
+      where: { sourceOrderId: id, status: QuotationStatus.CONVERTED },
+      _sum: { total: true },
+    });
+    const recalculatedTotal = _sum.total ?? new Prisma.Decimal(0);
+
+    await this.prisma.repairOrder.update({
+      where: { id },
+      data: { totalValue: recalculatedTotal },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "RECALCULATE_TOTAL",
+      entityType: "RepairOrder",
+      entityId: id,
+      previousValue: { totalValue: order.totalValue },
+      newValue: { totalValue: recalculatedTotal },
+    });
+
+    return this.findOne(id);
   }
 
   private async ensureExists(id: number) {
