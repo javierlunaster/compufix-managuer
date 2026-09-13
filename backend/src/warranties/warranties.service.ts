@@ -3,6 +3,7 @@ import { Prisma, RepairStatus, WarrantyStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
+import type { AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 import { CreateWarrantyDto } from "./dto/create-warranty.dto";
 import { UpdateWarrantyDto } from "./dto/update-warranty.dto";
 import { ClaimWarrantyDto } from "./dto/claim-warranty.dto";
@@ -72,7 +73,10 @@ export class WarrantiesService {
    * pantalla agregada llega en una fase posterior, pero la consulta que lo
    * alimentará ya puede existir y probarse desde ya.
    */
-  async findAll(params: { status?: WarrantyStatus; expiringWithinDays?: number }) {
+  async findAll(
+    params: { status?: WarrantyStatus; expiringWithinDays?: number },
+    actingUser?: AuthenticatedUser,
+  ) {
     const where: Prisma.WarrantyWhereInput = {};
     if (params.status) {
       where.status = params.status;
@@ -82,6 +86,12 @@ export class WarrantiesService {
       limit.setDate(limit.getDate() + params.expiringWithinDays);
       where.status = WarrantyStatus.ACTIVE;
       where.warrantyEndDate = { lte: limit, gte: new Date() };
+    }
+    // Sin actingUser (ej. la llamada interna del Dashboard) no se filtra —
+    // solo se restringe cuando el propio endpoint de Garantías identifica
+    // a un Técnico consultando directamente.
+    if (actingUser?.roleName === "Técnico") {
+      where.repairOrder = { technicianId: actingUser.id };
     }
 
     return this.prisma.warranty.findMany({

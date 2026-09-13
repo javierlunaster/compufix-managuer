@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, DiagnosticMeasurement } from "@/lib/types";
@@ -88,6 +89,8 @@ export function RepairOrderDetailPage() {
 // --- Encabezado: el elemento de firma (ver DESIGN.md) --------------------
 
 function OrderHeader({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
+  const { user } = useAuth();
+  const canAssignTechnician = user?.role !== "Técnico";
   const [changingStatus, setChangingStatus] = useState(false);
   const [assigningTechnician, setAssigningTechnician] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,21 +158,29 @@ function OrderHeader({ order, onChanged }: { order: RepairOrderDetail; onChanged
             ))}
           </Select>
 
-          <Select
-            value=""
-            disabled={assigningTechnician}
-            onChange={(e) => handleAssignTechnician(e.target.value)}
-            className="w-56 text-xs"
-          >
-            <option value="">
-              {order.technician ? `Técnico: ${order.technician.fullName}` : "Asignar técnico…"}
-            </option>
-            {technicians?.map((t) => (
-              <option key={t.id} value={t.id} disabled={t.id === order.technician?.id}>
-                {t.fullName}
+          {canAssignTechnician ? (
+            <Select
+              value=""
+              disabled={assigningTechnician}
+              onChange={(e) => handleAssignTechnician(e.target.value)}
+              className="w-56 text-xs"
+            >
+              <option value="">
+                {order.technician ? `Técnico: ${order.technician.fullName}` : "Asignar técnico…"}
               </option>
-            ))}
-          </Select>
+              {technicians?.map((t) => (
+                <option key={t.id} value={t.id} disabled={t.id === order.technician?.id}>
+                  {t.fullName}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            // Un Técnico no puede reasignarse la orden a sí mismo ni a
+            // otro colega — eso lo decide Administrador/Gerente.
+            <p className="text-xs text-ink-muted">
+              {order.technician ? `Técnico: ${order.technician.fullName}` : "Sin técnico asignado"}
+            </p>
+          )}
           {technicianError && <p className="text-xs text-danger">{technicianError}</p>}
         </div>
       </div>

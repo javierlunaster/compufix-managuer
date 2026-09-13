@@ -21,6 +21,24 @@ export class AttachmentsService {
   }
 
   /**
+   * Para que el controller valide acceso antes de borrar — un Attachment
+   * en la práctica siempre tiene repairOrderId (se crea únicamente desde
+   * este módulo, siempre bajo una ruta de orden), pero el campo es
+   * opcional en el schema, así que null es un caso válido de "nada que
+   * restringir".
+   */
+  async getOrderId(attachmentId: number): Promise<number | null> {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      select: { repairOrderId: true },
+    });
+    if (!attachment) {
+      throw new NotFoundException("Foto no encontrada");
+    }
+    return attachment.repairOrderId;
+  }
+
+  /**
    * Fotos generales de la orden (ej. estado físico del equipo al recibirlo
    * — sección 6/22 del brief). `repairLogId` queda en null a propósito:
    * es lo que distingue "foto general de la orden" de "foto de un paso

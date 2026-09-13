@@ -22,6 +22,29 @@ export class DiagnosticsService {
     return order;
   }
 
+  /** Para que el controller pueda validar acceso antes de tocar el recurso. */
+  async getOrderId(diagnosticId: number): Promise<number> {
+    const diagnostic = await this.prisma.repairDiagnostic.findUnique({
+      where: { id: diagnosticId },
+      select: { repairOrderId: true },
+    });
+    if (!diagnostic) {
+      throw new NotFoundException("Diagnóstico no encontrado");
+    }
+    return diagnostic.repairOrderId;
+  }
+
+  async getOrderIdForMeasurement(measurementId: number): Promise<number> {
+    const measurement = await this.prisma.diagnosticMeasurement.findUnique({
+      where: { id: measurementId },
+      select: { diagnostic: { select: { repairOrderId: true } } },
+    });
+    if (!measurement) {
+      throw new NotFoundException("Medición no encontrada");
+    }
+    return measurement.diagnostic.repairOrderId;
+  }
+
   /**
    * Una orden puede tener MÚLTIPLES diagnósticos (Regla 3 del brief): por
    * ejemplo, un primer diagnóstico que concluye "posible falla de fuente" y,

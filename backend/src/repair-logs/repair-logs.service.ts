@@ -19,6 +19,18 @@ export class RepairLogsService {
     return order;
   }
 
+  /** Para que el controller pueda validar acceso antes de tocar el recurso. */
+  async getOrderId(logId: number): Promise<number> {
+    const log = await this.prisma.repairLog.findUnique({
+      where: { id: logId },
+      select: { repairOrderId: true },
+    });
+    if (!log) {
+      throw new NotFoundException("Entrada de bitácora no encontrada");
+    }
+    return log.repairOrderId;
+  }
+
   /**
    * Una orden puede tener múltiples entradas de bitácora (Regla 3 del
    * brief). Cada entrada es un renglón cronológico: qué se hizo, qué se

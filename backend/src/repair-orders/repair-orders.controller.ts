@@ -28,54 +28,81 @@ export class RepairOrdersController {
     @Body() dto: CreateRepairOrderDto,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    // Un Técnico puede recibir un equipo y crear la orden, pero la
+    // asignación de técnico es exclusiva de Administrador/Gerente (ver
+    // assignTechnician más abajo) — nunca se auto-asigna ni asigna a otro
+    // colega colando el campo en el body de creación.
+    if (actingUser.roleName === "Técnico") {
+      dto.technicianId = undefined;
+    }
     return this.repairOrdersService.create(dto, actingUser.id);
   }
 
   // GET /repair-orders?search=C11061&status=RECEIVED&technicianId=3
   @Get()
   findAll(
+    @CurrentUser() actingUser: AuthenticatedUser,
     @Query("search") search?: string,
     @Query("status") status?: RepairStatus,
     @Query("technicianId") technicianId?: string,
   ) {
-    return this.repairOrdersService.findAll({
-      search,
-      status,
-      technicianId: technicianId ? Number(technicianId) : undefined,
-    });
+    return this.repairOrdersService.findAll(
+      {
+        search,
+        status,
+        technicianId: technicianId ? Number(technicianId) : undefined,
+      },
+      actingUser,
+    );
   }
 
   // Atajo para el caso de uso más frecuente: encontrar por código exacto
   // (sección 25 del brief — "al ingresar C11061 debe encontrar de inmediato...").
   @Get("by-code/:code")
-  findByCode(@Param("code") code: string) {
-    return this.repairOrdersService.findByCode(code);
+  async findByCode(
+    @Param("code") code: string,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    const order = await this.repairOrdersService.findByCode(code);
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, order.id);
+    return order;
   }
 
   @Get(":id")
-  findOne(@Param("id", ParseIntPipe) id: number) {
+  async findOne(
+    @Param("id", ParseIntPipe) id: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.findOne(id);
   }
 
   @Patch(":id")
-  update(
+  async update(
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: UpdateRepairOrderDto,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.update(id, dto, actingUser.id);
   }
 
   @Patch(":id/status")
-  updateStatus(
+  async updateStatus(
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: UpdateStatusDto,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.updateStatus(id, dto, actingUser.id);
   }
 
+  // Asignar (o reasignar) el técnico responsable es una decisión de
+  // gestión, no algo que el técnico mismo controle — de ahí la
+  // restricción de rol, distinta del resto de endpoints de esta orden
+  // (que se permiten si la orden ya es suya).
   @Patch(":id/assign-technician")
+  @Roles("Administrador", "Gerente")
   assignTechnician(
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: AssignTechnicianDto,
@@ -85,11 +112,12 @@ export class RepairOrdersController {
   }
 
   @Post(":id/procedures")
-  addProcedure(
+  async addProcedure(
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: AddProcedureDto,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.addProcedure(id, dto, actingUser.id);
   }
 
@@ -97,19 +125,21 @@ export class RepairOrdersController {
   // (sección 32 del brief) — no cualquier rol necesita verla.
   @Get(":id/device-password")
   @Roles("Administrador", "Gerente", "Técnico")
-  revealDevicePassword(
+  async revealDevicePassword(
     @Param("id", ParseIntPipe) id: number,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.revealDevicePassword(id, actingUser.id);
   }
 
   @Delete(":id/device-password")
   @Roles("Administrador", "Gerente", "Técnico")
-  purgeDevicePassword(
+  async purgeDevicePassword(
     @Param("id", ParseIntPipe) id: number,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.purgeDevicePassword(id, actingUser.id);
   }
 

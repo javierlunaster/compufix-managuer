@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -8,6 +9,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { encryptSecret, decryptSecret } from "../common/utils/encryption.util";
 import { normalizeName } from "../common/utils/normalize-name.util";
+import type { AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 import { CreateRepairOrderDto } from "./dto/create-repair-order.dto";
 import { UpdateRepairOrderDto } from "./dto/update-repair-order.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
@@ -84,6 +86,32 @@ export class RepairOrdersService {
     private prisma: PrismaService,
     private audit: AuditService,
   ) {}
+
+  /**
+   * Un Técnico solo puede ver y trabajar las reparaciones que un
+   * Administrador o Gerente le asignaron explícitamente (RepairOrder.
+   * technicianId === su propio id) — nunca las de otro técnico ni las que
+   * todavía no tienen técnico asignado. Administrador y Gerente no tienen
+   * esta restricción (no-op para ellos). Público y reutilizado por otros
+   * módulos (diagnósticos, bitácora, repuestos, pagos, garantías,
+   * documentos, fotos) antes de tocar cualquier recurso de una orden
+   * específica — la misma regla aplica a la orden y a todo lo que cuelga
+   * de ella.
+   */
+  async assertTechnicianAccess(user: AuthenticatedUser, orderId: number): Promise<void> {
+    if (user.roleName !== "Técnico") return;
+
+    const order = await this.prisma.repairOrder.findUnique({
+      where: { id: orderId },
+      select: { technicianId: true },
+    });
+    if (!order) {
+      throw new NotFoundException("Orden de reparación no encontrada");
+    }
+    if (order.technicianId !== user.id) {
+      throw new ForbiddenException("No tienes esta reparación asignada");
+    }
+  }
 
   async create(dto: CreateRepairOrderDto, actingUserId: number) {
     if (!dto.deviceId && !dto.newDevice) {
@@ -190,13 +218,21 @@ export class RepairOrdersService {
    * de la búsqueda global (repuestos, pagos, cotizaciones...) se completa
    * en fases posteriores cuando esos módulos existan.
    */
-  async findAll(params: { search?: string; status?: RepairStatus; technicianId?: number }) {
+  async findAll(
+    params: { search?: string; status?: RepairStatus; technicianId?: number },
+    actingUser: AuthenticatedUser,
+  ) {
     const where: Prisma.RepairOrderWhereInput = { recordStatus: "ACTIVE" };
 
     if (params.status) {
       where.status = params.status;
     }
-    if (params.technicianId) {
+    // Un Técnico solo ve lo que le asignaron — se ignora cualquier
+    // technicianId que haya venido en la consulta, nunca se le deja
+    // "espiar" el trabajo de otro técnico cambiando el parámetro.
+    if (actingUser.roleName === "Técnico") {
+      where.technicianId = actingUser.id;
+    } else if (params.technicianId) {
       where.technicianId = params.technicianId;
     }
     if (params.search) {

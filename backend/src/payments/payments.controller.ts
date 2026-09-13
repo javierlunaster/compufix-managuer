@@ -1,14 +1,21 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
 import { PaymentsService } from "./payments.service";
+import { RepairOrdersService } from "../repair-orders/repair-orders.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
 import { CurrentUser, AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 
 @Controller("payments")
 export class PaymentsController {
-  constructor(private paymentsService: PaymentsService) {}
+  constructor(
+    private paymentsService: PaymentsService,
+    private repairOrdersService: RepairOrdersService,
+  ) {}
 
   @Post()
-  create(@Body() dto: CreatePaymentDto, @CurrentUser() actingUser: AuthenticatedUser) {
+  async create(@Body() dto: CreatePaymentDto, @CurrentUser() actingUser: AuthenticatedUser) {
+    if (dto.repairOrderId) {
+      await this.repairOrdersService.assertTechnicianAccess(actingUser, dto.repairOrderId);
+    }
     return this.paymentsService.create(dto, actingUser.id);
   }
 
