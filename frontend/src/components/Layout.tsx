@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { BRAND } from "@/lib/branding";
 
 type NavItem = {
   to: string;
@@ -76,7 +77,7 @@ export function Layout({ children }: { children: ReactNode }) {
               oscuro del panel se volvería casi invisible, por eso va en
               una tarjeta blanca a modo de placa. */}
           <div className="flex items-center rounded bg-white px-2 py-1 shadow-sm">
-            <img src="/logo.png" alt="CompuFix" className="h-7 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto" />
           </div>
           <div className="flex-1">
             <p className="text-xs text-ink-muted">Manager</p>

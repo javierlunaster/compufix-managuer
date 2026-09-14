@@ -44,6 +44,6 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`COMPufix Manager API escuchando en http://localhost:${port}/api`);
+  console.log(`API escuchando en http://localhost:${port}/api`);
 }
 bootstrap();

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { usePortalAuth } from "@/lib/portalAuth";
+import { BRAND } from "@/lib/branding";
 
 export function PortalProtectedLayout({ children }: { children: ReactNode }) {
   const { customer, loading, logout } = usePortalAuth();
@@ -25,7 +26,7 @@ export function PortalProtectedLayout({ children }: { children: ReactNode }) {
           {/* Tarjeta blanca: el logo trae texto negro sin fondo propio, y
               este encabezado (como el resto del portal) es oscuro. */}
           <div className="flex items-center rounded bg-white px-2 py-1 shadow-sm">
-            <img src="/logo.png" alt="CompuFix" className="h-7 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto" />
           </div>
           <nav className="flex gap-4 text-sm text-ink-muted">
             <Link to="/portal/orders" className="hover:text-accent">

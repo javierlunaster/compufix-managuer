@@ -1,11 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { BRAND, WHATSAPP_URL, MAPS_URL } from "@/lib/branding";
 import "./LandingPage.css";
-
-const WHATSAPP_URL =
-  "https://wa.me/573013951619?text=Hola%2C%20quiero%20una%20cotizaci%C3%B3n%20para%20mi%20equipo";
-const MAPS_URL =
-  "https://www.google.com/maps/search/?api=1&query=Transversal+68+Manzana+31+Lote+21%2C+Las+Gaviotas+segunda+etapa%2C+Cartagena%2C+Bol%C3%ADvar";
 
 /**
  * Página pública de inicio — lo primero que ve cualquier visitante sin
@@ -14,7 +10,7 @@ const MAPS_URL =
  */
 export function LandingPage() {
   useEffect(() => {
-    document.title = "CompuFix Soluciones Integrales";
+    document.title = BRAND.name;
   }, []);
 
   return (
@@ -23,13 +19,13 @@ export function LandingPage() {
         <div className="wrap header-row">
           <div className="brand">
             <span className="brand-logo">
-              <img src="/logo.png" alt="CompuFix Soluciones Integrales" />
+              <img src={BRAND.logoUrl} alt={BRAND.name} />
             </span>
-            <span className="brand-tag">Cartagena, Bolívar</span>
+            <span className="brand-tag">{BRAND.locationTag}</span>
           </div>
           <div className="header-actions">
-            <a className="phone-readout" href="tel:+573013951619">
-              301 395 1619
+            <a className="phone-readout" href={`tel:${BRAND.phoneDial}`}>
+              {BRAND.phoneDisplay}
             </a>
             <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
               WhatsApp
@@ -50,8 +46,9 @@ export function LandingPage() {
                 Encontramos la falla <em>real</em> de tu equipo, no solo el síntoma.
               </h1>
               <p className="lede">
-                En CompuFix medimos voltajes, revisamos componentes y probamos placa por placa
-                antes de cotizar. Reparamos lo que de verdad está dañado — nada más, nada menos.
+                En {BRAND.shortName} medimos voltajes, revisamos componentes y probamos placa por
+                placa antes de cotizar. Reparamos lo que de verdad está dañado — nada más, nada
+                menos.
               </p>
               <div className="hero-actions">
                 <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
@@ -201,18 +198,18 @@ export function LandingPage() {
             <div className="block-head">
               <div>
                 <p className="eyebrow">Visítanos o escríbenos</p>
-                <h2>Taller en Las Gaviotas, Cartagena.</h2>
+                <h2>Taller en {BRAND.addressCity}.</h2>
               </div>
             </div>
             <div className="contact-grid">
               <div className="contact-card">
                 <h3>Dirección</h3>
                 <address>
-                  Transversal 68 Manzana 31 Lote 21
+                  {BRAND.addressLine1}
                   <br />
-                  Las Gaviotas, segunda etapa
+                  {BRAND.addressLine2}
                   <br />
-                  Cartagena, Bolívar
+                  {BRAND.addressCity}
                 </address>
                 <a className="map-link" href={MAPS_URL} target="_blank" rel="noreferrer">
                   Ver en el mapa →
@@ -221,43 +218,40 @@ export function LandingPage() {
               <div className="contact-card">
                 <h3>Teléfono</h3>
                 <address>
-                  <a className="phone-readout" href="tel:+573013951619" style={{ fontSize: "1.1rem" }}>
-                    301 395 1619
+                  <a
+                    className="phone-readout"
+                    href={`tel:${BRAND.phoneDial}`}
+                    style={{ fontSize: "1.1rem" }}
+                  >
+                    {BRAND.phoneDisplay}
                   </a>
                 </address>
                 <a className="map-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
                   Escribir por WhatsApp →
                 </a>
               </div>
-              <div className="contact-card">
-                <h3>Redes</h3>
-                <div className="ports">
-                  <a
-                    className="port-tag"
-                    href="https://www.facebook.com/compufixsolucionesintegrales/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Facebook <span className="arrow">↗</span>
-                  </a>
-                  <a
-                    className="port-tag"
-                    href="https://www.instagram.com/javierenriqueluna/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Instagram <span className="arrow">↗</span>
-                  </a>
-                  <a
-                    className="port-tag"
-                    href="https://www.youtube.com/@javierlunamarzola"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    YouTube <span className="arrow">↗</span>
-                  </a>
+              {(BRAND.facebookUrl || BRAND.instagramUrl || BRAND.youtubeUrl) && (
+                <div className="contact-card">
+                  <h3>Redes</h3>
+                  <div className="ports">
+                    {BRAND.facebookUrl && (
+                      <a className="port-tag" href={BRAND.facebookUrl} target="_blank" rel="noreferrer">
+                        Facebook <span className="arrow">↗</span>
+                      </a>
+                    )}
+                    {BRAND.instagramUrl && (
+                      <a className="port-tag" href={BRAND.instagramUrl} target="_blank" rel="noreferrer">
+                        Instagram <span className="arrow">↗</span>
+                      </a>
+                    )}
+                    {BRAND.youtubeUrl && (
+                      <a className="port-tag" href={BRAND.youtubeUrl} target="_blank" rel="noreferrer">
+                        YouTube <span className="arrow">↗</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </section>
@@ -265,8 +259,10 @@ export function LandingPage() {
 
       <footer className="site">
         <div className="wrap footer-row">
-          <span>© 2026 CompuFix Soluciones Integrales — Cartagena, Colombia</span>
-          <span>Diagnóstico · Reparación · Repuestos</span>
+          <span>
+            © {new Date().getFullYear()} {BRAND.name} — {BRAND.footerLocation}
+          </span>
+          <span>{BRAND.footerTagline}</span>
         </div>
       </footer>
     </div>

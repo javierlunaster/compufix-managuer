@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePortalAuth } from "@/lib/portalAuth";
 import { PortalApiError } from "@/lib/portalApi";
+import { BRAND } from "@/lib/branding";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
 
 export function PortalLoginPage() {
@@ -32,7 +33,7 @@ export function PortalLoginPage() {
           {/* Tarjeta blanca: el logo trae texto negro sin fondo propio,
               sobre este fondo oscuro se volvería casi invisible. */}
           <div className="mx-auto mb-3 inline-flex items-center rounded-lg bg-white px-4 py-2 shadow-sm">
-            <img src="/logo.png" alt="CompuFix Soluciones Integrales" className="h-10 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.name} className="h-10 w-auto" />
           </div>
           <p className="text-sm text-ink-muted">Consulta tus reparaciones</p>
         </div>

@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { BUSINESS_NAME, BUSINESS_TAGLINE } from "../config/branding.config";
 
 /**
  * Las fuentes estándar de PDFKit (Helvetica y compañía) solo soportan la
@@ -62,7 +63,9 @@ export class PdfBuilder {
     this.doc
       .fontSize(9)
       .fillColor("#6b7280")
-      .text("COMPUFIX — TALLER DE REPARACIÓN DE COMPUTADORES", { align: "left" });
+      .text(sanitizeForPdf(`${BUSINESS_NAME.toUpperCase()} — ${BUSINESS_TAGLINE.toUpperCase()}`), {
+        align: "left",
+      });
 
     this.doc
       .moveDown(0.3)

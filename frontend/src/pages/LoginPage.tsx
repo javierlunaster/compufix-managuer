@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { BRAND } from "@/lib/branding";
 import { Button, ErrorBanner, Field, Input } from "@/components/ui";
 
 export function LoginPage() {
@@ -33,7 +34,7 @@ export function LoginPage() {
           {/* Tarjeta blanca: el logo trae texto negro sin fondo propio,
               sobre este fondo oscuro se volvería casi invisible. */}
           <div className="inline-flex items-center rounded-lg bg-white px-4 py-2 shadow-sm">
-            <img src="/logo.png" alt="CompuFix Soluciones Integrales" className="h-10 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.name} className="h-10 w-auto" />
           </div>
           <div className="text-center">
             <p className="text-sm text-ink-muted">Sistema del taller</p>
