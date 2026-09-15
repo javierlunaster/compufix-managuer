@@ -270,6 +270,34 @@ export type RepairOrderDetail = {
   payments: PaymentEntry[];
   photos: Attachment[];
   warranties: Warranty[];
+  hardwareTestResults: HardwareTestResult[];
+};
+
+export type HardwareTestCategory = "KEYBOARD" | "CAMERA" | "SOUND" | "DISK" | "PERIPHERALS";
+export type HardwareTestStatus = "PASSED" | "FAILED" | "NOT_APPLICABLE";
+
+export const HARDWARE_TEST_CATEGORY_LABELS: Record<HardwareTestCategory, string> = {
+  KEYBOARD: "Teclado",
+  CAMERA: "Cámara",
+  SOUND: "Sonido",
+  DISK: "Disco",
+  PERIPHERALS: "Periféricos",
+};
+
+export const HARDWARE_TEST_STATUS_LABELS: Record<HardwareTestStatus, string> = {
+  PASSED: "Aprobado",
+  FAILED: "Falla",
+  NOT_APPLICABLE: "No aplica",
+};
+
+export type HardwareTestResult = {
+  id: number;
+  category: HardwareTestCategory;
+  testName: string;
+  status: HardwareTestStatus;
+  notes?: string | null;
+  testedAt: string;
+  testedBy?: { id: number; fullName: string } | null;
 };
 
 export type PartsCostSummary = {

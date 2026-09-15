@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { HardwareTestCategory, HardwareTestStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
@@ -6,6 +7,20 @@ import { PdfBuilder } from "../common/pdf/pdf-builder.util";
 import { BUSINESS_NAME } from "../common/config/branding.config";
 import { formatCurrency, formatDate, formatDateTime } from "../common/utils/format.util";
 import { REPAIR_STATUS_LABELS } from "../common/utils/repair-status-labels.util";
+
+const HARDWARE_TEST_CATEGORY_LABELS: Record<HardwareTestCategory, string> = {
+  KEYBOARD: "Teclado",
+  CAMERA: "Cámara",
+  SOUND: "Sonido",
+  DISK: "Disco",
+  PERIPHERALS: "Periféricos",
+};
+
+const HARDWARE_TEST_STATUS_LABELS: Record<HardwareTestStatus, string> = {
+  PASSED: "Aprobado",
+  FAILED: "Falla",
+  NOT_APPLICABLE: "No aplica",
+};
 
 @Injectable()
 export class DocumentsService {
@@ -149,7 +164,12 @@ export class DocumentsService {
     // por un daño previo) y en qué estado se entrega (protege al cliente,
     // confirma que el trabajo se hizo). "equipo_recibido" y sin categoría
     // (fotos subidas antes de esta separación) cuentan como ingreso.
-    const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+    // "prueba_camara" (evidencia de la pestaña Pruebas de entrega) tampoco
+    // cuenta como estado de ingreso — se imprime aparte, junto a la tabla
+    // de pruebas, en el comprobante de entrega.
+    const intakePhotos = order.photos.filter(
+      (p) => p.category !== "resultado_final" && p.category !== "prueba_camara",
+    );
     const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
 
     if (intakePhotos.length > 0) {
@@ -275,6 +295,30 @@ export class DocumentsService {
       ]);
     } else {
       pdf.paragraph("Este servicio no incluye garantía registrada.");
+    }
+
+    // Pruebas de hardware verificadas antes de la entrega (teclado, cámara,
+    // sonido, disco, periféricos — ver hardware-tests module). Solo se
+    // imprime si el técnico alcanzó a registrar al menos una, igual que
+    // el resto de secciones opcionales de este documento; sirve como
+    // respaldo formal de lo que se verificó frente al cliente.
+    if (order.hardwareTestResults.length > 0) {
+      pdf.sectionTitle("Pruebas realizadas antes de la entrega");
+      pdf.table(
+        ["Categoría", "Prueba", "Resultado", "Notas"],
+        order.hardwareTestResults.map((t) => [
+          HARDWARE_TEST_CATEGORY_LABELS[t.category],
+          t.testName,
+          HARDWARE_TEST_STATUS_LABELS[t.status],
+          t.notes ?? "",
+        ]),
+        [80, 140, 80, 180],
+      );
+
+      const cameraEvidence = order.photos.filter((p) => p.category === "prueba_camara");
+      if (cameraEvidence.length > 0) {
+        pdf.photoGrid(await this.buildPhotoGridEntries(cameraEvidence));
+      }
     }
 
     pdf.spacer(40);

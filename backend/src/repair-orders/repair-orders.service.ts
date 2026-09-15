@@ -62,6 +62,10 @@ const ORDER_DETAIL_INCLUDE = {
     orderBy: { date: "desc" as const },
   },
   warranties: { orderBy: { deliveryDate: "desc" as const } },
+  hardwareTestResults: {
+    orderBy: { testedAt: "asc" as const },
+    include: { testedBy: { select: { id: true, fullName: true } } },
+  },
   photos: {
     // Ni de bitácora ni de un diagnóstico puntual — mismo filtro que ya
     // usa AttachmentsService.findGeneralPhotosForOrder(); este campo se

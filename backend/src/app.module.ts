@@ -13,6 +13,7 @@ import { CustomersModule } from "./customers/customers.module";
 import { DevicesModule } from "./devices/devices.module";
 import { RepairOrdersModule } from "./repair-orders/repair-orders.module";
 import { DiagnosticsModule } from "./diagnostics/diagnostics.module";
+import { HardwareTestsModule } from "./hardware-tests/hardware-tests.module";
 import { RepairLogsModule } from "./repair-logs/repair-logs.module";
 import { InventoryModule } from "./inventory/inventory.module";
 import { RepairPartsModule } from "./repair-parts/repair-parts.module";
@@ -54,6 +55,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     DevicesModule,
     RepairOrdersModule,
     DiagnosticsModule,
+    HardwareTestsModule,
     RepairLogsModule,
     InventoryModule,
     RepairPartsModule,

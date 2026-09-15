@@ -14,7 +14,7 @@
 // =============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Se fija explícitamente en vez de dejar que Prisma autodetecte la
   // versión de OpenSSL del contenedor — esa detección venía fallando en
   // Railway (avisaba "failed to detect... Defaulting to openssl-1.1.x")
@@ -73,33 +73,34 @@ model RolePermission {
 // usa el sistema es un User; los que reparan equipos además tienen datos de
 // productividad/especialidad.
 model User {
-  id             Int          @id @default(autoincrement())
-  fullName       String
-  documentId     String?      @unique
-  email          String?      @unique
-  phone          String?
-  username       String       @unique
-  passwordHash   String
-  roleId         Int
-  role           Role         @relation(fields: [roleId], references: [id])
-  specialty      String? // solo aplica a técnicos, texto libre por ahora
-  status         RecordStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now())
+  id           Int          @id @default(autoincrement())
+  fullName     String
+  documentId   String?      @unique
+  email        String?      @unique
+  phone        String?
+  username     String       @unique
+  passwordHash String
+  roleId       Int
+  role         Role         @relation(fields: [roleId], references: [id])
+  specialty    String? // solo aplica a técnicos, texto libre por ahora
+  status       RecordStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
 
   // relaciones donde este usuario participa
-  assignedOrders      RepairOrder[]        @relation("AssignedTechnician")
-  statusChanges        RepairStatusHistory[]
-  diagnosticsPerformed RepairDiagnostic[]
-  logEntries           RepairLog[]
-  serviceJobs          ServiceJob[]         @relation("TechnicianOnJob")
-  sales                Sale[]
-  payments             Payment[]
-  inventoryMovements   InventoryMovement[]
-  cashRegistersOpened  CashRegister[]       @relation("OpenedBy")
-  cashRegistersClosed  CashRegister[]       @relation("ClosedBy")
-  cashMovements        CashMovement[]
-  auditLogs            AuditLog[]
-  attachmentsUploaded  Attachment[]
+  assignedOrders         RepairOrder[]         @relation("AssignedTechnician")
+  statusChanges          RepairStatusHistory[]
+  diagnosticsPerformed   RepairDiagnostic[]
+  logEntries             RepairLog[]
+  serviceJobs            ServiceJob[]          @relation("TechnicianOnJob")
+  sales                  Sale[]
+  payments               Payment[]
+  inventoryMovements     InventoryMovement[]
+  cashRegistersOpened    CashRegister[]        @relation("OpenedBy")
+  cashRegistersClosed    CashRegister[]        @relation("ClosedBy")
+  cashMovements          CashMovement[]
+  auditLogs              AuditLog[]
+  attachmentsUploaded    Attachment[]
+  hardwareTestsPerformed HardwareTestResult[]
 
   @@map("users")
 }
@@ -114,29 +115,29 @@ enum CustomerType {
 }
 
 model Customer {
-  id           Int          @id @default(autoincrement())
-  fullName     String
+  id             Int          @id @default(autoincrement())
+  fullName       String
   // normalizedName se usa en la migración para detectar/fusionar duplicados
   // (minúsculas, sin tildes, sin espacios extra) — ver plan de migración.
   normalizedName String
-  customerType CustomerType @default(PERSON)
-  documentId   String? // cédula/NIT — el Excel nunca lo capturaba; queda opcional pero se recomienda exigirlo hacia adelante
-  phone        String?
-  whatsapp     String?
-  email        String?
-  address      String?
-  city         String?
-  notes        String?
-  status       RecordStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now())
+  customerType   CustomerType @default(PERSON)
+  documentId     String? // cédula/NIT — el Excel nunca lo capturaba; queda opcional pero se recomienda exigirlo hacia adelante
+  phone          String?
+  whatsapp       String?
+  email          String?
+  address        String?
+  city           String?
+  notes          String?
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
 
-  repairOrders   RepairOrder[]       @relation("CustomerOrders")
-  devices        Device[]            @relation("CustomerDevices")
-  quotations   CustomerQuotation[]
-  sales        Sale[]
-  payments     Payment[]
-  serviceJobs  ServiceJob[]
-  warrantyClaims Warranty[] @relation("ClaimingCustomer")
+  repairOrders     RepairOrder[]       @relation("CustomerOrders")
+  devices          Device[]            @relation("CustomerDevices")
+  quotations       CustomerQuotation[]
+  sales            Sale[]
+  payments         Payment[]
+  serviceJobs      ServiceJob[]
+  warrantyClaims   Warranty[]          @relation("ClaimingCustomer")
   softwareLicenses SoftwareLicense[]
 
   @@index([normalizedName])
@@ -156,10 +157,10 @@ model Supplier {
   notes          String?
   status         RecordStatus @default(ACTIVE)
 
-  productRefs    ProductSupplierRef[]
-  purchases      Purchase[]
+  productRefs        ProductSupplierRef[]
+  purchases          Purchase[]
   priceRequestQuotes SupplierPriceRequestQuote[]
-  paymentAccounts PaymentAccount[]
+  paymentAccounts    PaymentAccount[]
 
   @@map("suppliers")
 }
@@ -216,30 +217,30 @@ model ProductCategory {
 }
 
 model Product {
-  id            Int             @id @default(autoincrement())
-  sku           String          @unique
-  internalCode  String? // "Referencia Jawan" en el Excel — código propio del taller
-  categoryId    Int
-  category      ProductCategory @relation(fields: [categoryId], references: [id])
-  brandId       Int?
-  brand         Brand?          @relation(fields: [brandId], references: [id])
-  description   String
-  cost          Decimal         @default(0) @db.Decimal(12, 2)
-  salePrice     Decimal         @default(0) @db.Decimal(12, 2)
-  stock         Int             @default(0) // caché — la fuente de verdad son los InventoryMovement
-  minStock      Int             @default(0)
-  location      String?
+  id             Int             @id @default(autoincrement())
+  sku            String          @unique
+  internalCode   String? // "Referencia Jawan" en el Excel — código propio del taller
+  categoryId     Int
+  category       ProductCategory @relation(fields: [categoryId], references: [id])
+  brandId        Int?
+  brand          Brand?          @relation(fields: [brandId], references: [id])
+  description    String
+  cost           Decimal         @default(0) @db.Decimal(12, 2)
+  salePrice      Decimal         @default(0) @db.Decimal(12, 2)
+  stock          Int             @default(0) // caché — la fuente de verdad son los InventoryMovement
+  minStock       Int             @default(0)
+  location       String?
   warrantyMonths Int?
-  status        RecordStatus    @default(ACTIVE)
-  createdAt     DateTime        @default(now())
+  status         RecordStatus    @default(ACTIVE)
+  createdAt      DateTime        @default(now())
 
-  supplierRefs       ProductSupplierRef[]
-  movements          InventoryMovement[]
-  purchaseItems      PurchaseItem[]
-  saleItems          SaleItem[]
-  repairParts        RepairPart[]
-  quotationItems     QuotationItem[]
-  softwareLicenses   SoftwareLicense[]
+  supplierRefs     ProductSupplierRef[]
+  movements        InventoryMovement[]
+  purchaseItems    PurchaseItem[]
+  saleItems        SaleItem[]
+  repairParts      RepairPart[]
+  quotationItems   QuotationItem[]
+  softwareLicenses SoftwareLicense[]
 
   @@map("products")
 }
@@ -290,22 +291,22 @@ enum InventoryMovementType {
 }
 
 model InventoryMovement {
-  id            Int                    @id @default(autoincrement())
+  id            Int                   @id @default(autoincrement())
   productId     Int
-  product       Product                @relation(fields: [productId], references: [id])
+  product       Product               @relation(fields: [productId], references: [id])
   type          InventoryMovementType
   quantity      Int // positivo = entra, negativo = sale
-  unitCost      Decimal?               @db.Decimal(12, 2)
+  unitCost      Decimal?              @db.Decimal(12, 2)
   repairOrderId Int?
-  repairOrder   RepairOrder?           @relation(fields: [repairOrderId], references: [id])
+  repairOrder   RepairOrder?          @relation(fields: [repairOrderId], references: [id])
   purchaseId    Int?
-  purchase      Purchase?              @relation(fields: [purchaseId], references: [id])
+  purchase      Purchase?             @relation(fields: [purchaseId], references: [id])
   saleId        Int?
-  sale          Sale?                  @relation(fields: [saleId], references: [id])
+  sale          Sale?                 @relation(fields: [saleId], references: [id])
   userId        Int
-  user          User                   @relation(fields: [userId], references: [id])
+  user          User                  @relation(fields: [userId], references: [id])
   notes         String?
-  createdAt     DateTime               @default(now())
+  createdAt     DateTime              @default(now())
 
   @@map("inventory_movements")
 }
@@ -330,19 +331,19 @@ enum PaymentStatus {
 }
 
 model Purchase {
-  id            Int             @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   supplierId    Int
-  supplier      Supplier        @relation(fields: [supplierId], references: [id])
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
   date          DateTime
   invoiceNumber String?
-  subtotal      Decimal         @db.Decimal(12, 2)
-  tax           Decimal         @default(0) @db.Decimal(12, 2)
-  shipping      Decimal         @default(0) @db.Decimal(12, 2)
-  total         Decimal         @db.Decimal(12, 2)
+  subtotal      Decimal        @db.Decimal(12, 2)
+  tax           Decimal        @default(0) @db.Decimal(12, 2)
+  shipping      Decimal        @default(0) @db.Decimal(12, 2)
+  total         Decimal        @db.Decimal(12, 2)
   paymentMethod PaymentMethod?
-  paymentStatus PaymentStatus   @default(PENDING)
+  paymentStatus PaymentStatus  @default(PENDING)
   notes         String?
-  status        RecordStatus    @default(ACTIVE)
+  status        RecordStatus   @default(ACTIVE)
 
   items     PurchaseItem[]
   movements InventoryMovement[]
@@ -373,17 +374,17 @@ enum PriceRequestStatus {
 }
 
 model SupplierPriceRequest {
-  id               Int                          @id @default(autoincrement())
-  date             DateTime
+  id                 Int                @id @default(autoincrement())
+  date               DateTime
   productDescription String
-  quantityNeeded   Int                          @default(1)
-  chosenSupplierId Int?
-  finalPrice       Decimal?                     @db.Decimal(12, 2)
-  shippingCost     Decimal?                     @db.Decimal(12, 2)
-  profit           Decimal?                     @db.Decimal(12, 2)
-  trackingGuide    String?
-  status           PriceRequestStatus           @default(REQUESTED)
-  notes            String?
+  quantityNeeded     Int                @default(1)
+  chosenSupplierId   Int?
+  finalPrice         Decimal?           @db.Decimal(12, 2)
+  shippingCost       Decimal?           @db.Decimal(12, 2)
+  profit             Decimal?           @db.Decimal(12, 2)
+  trackingGuide      String?
+  status             PriceRequestStatus @default(REQUESTED)
+  notes              String?
 
   quotes SupplierPriceRequestQuote[]
 
@@ -393,12 +394,12 @@ model SupplierPriceRequest {
 // Un renglón por proveedor cotizante (antes eran columnas fijas: "Virtual
 // Tronic", "Jawam", "Digital", "Otro" — ahora es una tabla N:1 sin límite).
 model SupplierPriceRequestQuote {
-  id              Int                    @id @default(autoincrement())
-  priceRequestId  Int
-  priceRequest    SupplierPriceRequest   @relation(fields: [priceRequestId], references: [id])
-  supplierId      Int
-  supplier        Supplier               @relation(fields: [supplierId], references: [id])
-  quotedPrice     Decimal                @db.Decimal(12, 2)
+  id             Int                  @id @default(autoincrement())
+  priceRequestId Int
+  priceRequest   SupplierPriceRequest @relation(fields: [priceRequestId], references: [id])
+  supplierId     Int
+  supplier       Supplier             @relation(fields: [supplierId], references: [id])
+  quotedPrice    Decimal              @db.Decimal(12, 2)
 
   @@unique([priceRequestId, supplierId])
   @@map("supplier_price_request_quotes")
@@ -409,18 +410,18 @@ model SupplierPriceRequestQuote {
 // -----------------------------------------------------------------------------
 
 model Sale {
-  id            Int            @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   customerId    Int?
-  customer      Customer?      @relation(fields: [customerId], references: [id])
+  customer      Customer?     @relation(fields: [customerId], references: [id])
   sellerId      Int
-  seller        User           @relation(fields: [sellerId], references: [id])
-  date          DateTime       @default(now())
+  seller        User          @relation(fields: [sellerId], references: [id])
+  date          DateTime      @default(now())
   invoiceNumber String?
-  subtotal      Decimal        @db.Decimal(12, 2)
-  discount      Decimal        @default(0) @db.Decimal(12, 2)
-  total         Decimal        @db.Decimal(12, 2)
+  subtotal      Decimal       @db.Decimal(12, 2)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
   paymentMethod PaymentMethod
-  status        RecordStatus   @default(ACTIVE)
+  status        RecordStatus  @default(ACTIVE)
 
   items     SaleItem[]
   movements InventoryMovement[]
@@ -448,15 +449,15 @@ model SaleItem {
 // -----------------------------------------------------------------------------
 
 model Service {
-  id                Int          @id @default(autoincrement())
-  code              String?      @unique // de "Codigos de facturacion"
-  name              String
-  description       String?
-  basePrice         Decimal      @db.Decimal(12, 2)
-  estimatedCost     Decimal?     @db.Decimal(12, 2)
-  warrantyMonths    Int?
-  estimatedTimeHours Decimal?    @db.Decimal(6, 2)
-  status            RecordStatus @default(ACTIVE)
+  id                 Int          @id @default(autoincrement())
+  code               String?      @unique // de "Codigos de facturacion"
+  name               String
+  description        String?
+  basePrice          Decimal      @db.Decimal(12, 2)
+  estimatedCost      Decimal?     @db.Decimal(12, 2)
+  warrantyMonths     Int?
+  estimatedTimeHours Decimal?     @db.Decimal(6, 2)
+  status             RecordStatus @default(ACTIVE)
 
   repairServices RepairService[]
   quotationItems QuotationItem[]
@@ -467,20 +468,20 @@ model Service {
 // Mapea la hoja "Servicios": trabajos B2B con comisión de técnico. Distinto
 // del flujo normal de reparación porque paga comisión, no usa repair_orders.
 model ServiceJob {
-  id                     Int          @id @default(autoincrement())
-  date                   DateTime
-  customerId             Int
-  customer               Customer     @relation(fields: [customerId], references: [id])
-  description            String
-  technicianId           Int
-  technician             User         @relation("TechnicianOnJob", fields: [technicianId], references: [id])
-  chargedAmount          Decimal      @db.Decimal(12, 2)
+  id                    Int           @id @default(autoincrement())
+  date                  DateTime
+  customerId            Int
+  customer              Customer      @relation(fields: [customerId], references: [id])
+  description           String
+  technicianId          Int
+  technician            User          @relation("TechnicianOnJob", fields: [technicianId], references: [id])
+  chargedAmount         Decimal       @db.Decimal(12, 2)
   // Confirmado: el % de comisión se ajusta manualmente por servicio, no es
   // una regla fija del negocio — por eso se captura el monto, no un %.
-  retentionAmount        Decimal      @db.Decimal(12, 2)
-  amountToPayTechnician  Decimal      @db.Decimal(12, 2)
-  paymentStatus          PaymentStatus @default(PENDING)
-  notes                  String?
+  retentionAmount       Decimal       @db.Decimal(12, 2)
+  amountToPayTechnician Decimal       @db.Decimal(12, 2)
+  paymentStatus         PaymentStatus @default(PENDING)
+  notes                 String?
 
   @@map("service_jobs")
 }
@@ -507,27 +508,27 @@ enum RepairStatus {
 }
 
 model RepairOrder {
-  id           Int          @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   // Código visible al cliente, ej. "C11061" — generado como 'C' + id para
   // mantener compatibilidad con el formato ya usado en Bitacora de
   // reparaciones y Datos de Operacion (confirmado por cruce de datos).
-  orderCode    String       @unique
+  orderCode    String   @unique
   customerId   Int
-  customer     Customer     @relation("CustomerOrders", fields: [customerId], references: [id])
+  customer     Customer @relation("CustomerOrders", fields: [customerId], references: [id])
   technicianId Int?
-  technician   User?        @relation("AssignedTechnician", fields: [technicianId], references: [id])
+  technician   User?    @relation("AssignedTechnician", fields: [technicianId], references: [id])
 
   // El equipo es una entidad propia (ver Device más abajo) para poder
   // relacionar todo el historial de un mismo equipo físico entre varias
   // visitas (Regla 6 del brief). Los datos que describen AL EQUIPO viven en
   // Device; aquí solo queda lo que describe ESTE ingreso puntual.
-  deviceId     Int
-  device       Device       @relation(fields: [deviceId], references: [id])
+  deviceId Int
+  device   Device @relation(fields: [deviceId], references: [id])
 
-  chargerReceived  Boolean @default(false)
-  batteryReceived  Boolean @default(false)
-  keyboardReceived Boolean @default(false)
-  mouseReceived    Boolean @default(false)
+  chargerReceived   Boolean @default(false)
+  batteryReceived   Boolean @default(false)
+  keyboardReceived  Boolean @default(false)
+  mouseReceived     Boolean @default(false)
   physicalCondition String?
   accessoriesNotes  String?
 
@@ -538,30 +539,31 @@ model RepairOrder {
   // debe conservarse indefinidamente una vez entregado el equipo.
   devicePasswordEncrypted String?
 
-  entryReason    String?
-  reportedIssue  String
-  status         RepairStatus @default(RECEIVED)
+  entryReason   String?
+  reportedIssue String
+  status        RepairStatus @default(RECEIVED)
 
-  totalValue  Decimal  @default(0) @db.Decimal(12, 2)
-  paidAmount  Decimal  @default(0) @db.Decimal(12, 2)
+  totalValue Decimal @default(0) @db.Decimal(12, 2)
+  paidAmount Decimal @default(0) @db.Decimal(12, 2)
   // balance y ganancia NO se guardan: se calculan en la capa de aplicación.
 
-  entryDate    DateTime  @default(now())
+  entryDate    DateTime     @default(now())
   deliveryDate DateTime?
   notes        String?
   recordStatus RecordStatus @default(ACTIVE)
 
-  statusHistory     RepairStatusHistory[]
-  diagnostics       RepairDiagnostic[]
-  logs              RepairLog[]
-  partsUsed         RepairPart[]
-  servicesUsed      RepairService[]
-  procedures        RepairProcedure[]
-  photos            Attachment[]        @relation("RepairOrderAttachments")
-  quotations        CustomerQuotation[] @relation("QuotationSourceOrder")
-  payments          Payment[]
-  warranties        Warranty[]          @relation("OriginRepairOrder")
-  inventoryMovements InventoryMovement[]
+  statusHistory       RepairStatusHistory[]
+  diagnostics         RepairDiagnostic[]
+  logs                RepairLog[]
+  partsUsed           RepairPart[]
+  servicesUsed        RepairService[]
+  procedures          RepairProcedure[]
+  photos              Attachment[]          @relation("RepairOrderAttachments")
+  quotations          CustomerQuotation[]   @relation("QuotationSourceOrder")
+  payments            Payment[]
+  warranties          Warranty[]            @relation("OriginRepairOrder")
+  inventoryMovements  InventoryMovement[]
+  hardwareTestResults HardwareTestResult[]
 
   @@map("repair_orders")
 }
@@ -571,25 +573,25 @@ model RepairOrder {
 // número de serie, y ver el historial completo de reparaciones de un mismo
 // equipo (Regla 6), no solo de un cliente (Regla 5).
 model Device {
-  id           Int         @id @default(autoincrement())
-  customerId   Int
-  customer     Customer    @relation("CustomerDevices", fields: [customerId], references: [id])
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  customer   Customer @relation("CustomerDevices", fields: [customerId], references: [id])
 
-  deviceTypeId Int
-  deviceType   DeviceType  @relation(fields: [deviceTypeId], references: [id])
-  brandId      Int?
-  brand        Brand?      @relation(fields: [brandId], references: [id])
-  model        String?
-  serialNumber String?
-  boardModel   String?
-  cpu          String?
-  ram          String?
-  disk         String?
+  deviceTypeId    Int
+  deviceType      DeviceType @relation(fields: [deviceTypeId], references: [id])
+  brandId         Int?
+  brand           Brand?     @relation(fields: [brandId], references: [id])
+  model           String?
+  serialNumber    String?
+  boardModel      String?
+  cpu             String?
+  ram             String?
+  disk            String?
   operatingSystem String?
-  notes        String?
+  notes           String?
 
-  status       RecordStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now())
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
 
   repairOrders RepairOrder[]
 
@@ -614,15 +616,15 @@ model RepairProcedure {
 }
 
 model RepairStatusHistory {
-  id            Int          @id @default(autoincrement())
-  repairOrderId Int
-  repairOrder   RepairOrder  @relation(fields: [repairOrderId], references: [id])
+  id             Int           @id @default(autoincrement())
+  repairOrderId  Int
+  repairOrder    RepairOrder   @relation(fields: [repairOrderId], references: [id])
   previousStatus RepairStatus?
-  newStatus     RepairStatus
-  changedAt     DateTime     @default(now())
-  userId        Int
-  user          User         @relation(fields: [userId], references: [id])
-  notes         String?
+  newStatus      RepairStatus
+  changedAt      DateTime      @default(now())
+  userId         Int
+  user           User          @relation(fields: [userId], references: [id])
+  notes          String?
 
   @@map("repair_status_history")
 }
@@ -632,29 +634,29 @@ model RepairStatusHistory {
 // -----------------------------------------------------------------------------
 
 model RepairDiagnostic {
-  id              Int          @id @default(autoincrement())
-  repairOrderId   Int
-  repairOrder     RepairOrder  @relation(fields: [repairOrderId], references: [id])
-  technicianId    Int?
-  technician      User?        @relation(fields: [technicianId], references: [id])
+  id            Int         @id @default(autoincrement())
+  repairOrderId Int
+  repairOrder   RepairOrder @relation(fields: [repairOrderId], references: [id])
+  technicianId  Int?
+  technician    User?       @relation(fields: [technicianId], references: [id])
 
-  boardReference  String? // ej. "6050A3356201"
-  chargerIc       String? // ej. "BQ25A"
-  initialSymptom  String?
-  componentSuspected String?
-  componentReplaced  String?
-  biosReprogrammed   Boolean @default(false)
-  ecReviewed         Boolean @default(false)
-  ecReprogrammed     Boolean @default(false)
+  boardReference      String? // ej. "6050A3356201"
+  chargerIc           String? // ej. "BQ25A"
+  initialSymptom      String?
+  componentSuspected  String?
+  componentReplaced   String?
+  biosReprogrammed    Boolean  @default(false)
+  ecReviewed          Boolean  @default(false)
+  ecReprogrammed      Boolean  @default(false)
   proceduresPerformed String?
-  result             String?
-  createdAt          DateTime @default(now())
+  result              String?
+  createdAt           DateTime @default(now())
 
   measurements DiagnosticMeasurement[]
   // Fotos que evidencian el trabajo realizado y el estado final del
   // equipo (a diferencia de las fotos de bitácora, estas SÍ se muestran
   // en el portal del cliente — ver customer-portal.service.ts).
-  photos Attachment[] @relation("DiagnosticAttachments")
+  photos       Attachment[]            @relation("DiagnosticAttachments")
 
   @@map("repair_diagnostics")
 }
@@ -663,16 +665,58 @@ model RepairDiagnostic {
 // ACOK, PLTRST, RSMRST...) — permite agregar cualquier punto de cualquier
 // placa sin tocar el esquema, tal como pide la sección 8 del brief.
 model DiagnosticMeasurement {
-  id             Int               @id @default(autoincrement())
-  diagnosticId   Int
-  diagnostic     RepairDiagnostic  @relation(fields: [diagnosticId], references: [id])
-  pointName      String // ej. "ACDET", "PL612", "Consumo S0"
-  expectedValue  String?
-  measuredValue  String?
-  unit           String? // V, A, Ω, Estado...
-  status         String? // OK, FUERA DE RANGO, N/A...
+  id            Int              @id @default(autoincrement())
+  diagnosticId  Int
+  diagnostic    RepairDiagnostic @relation(fields: [diagnosticId], references: [id])
+  pointName     String // ej. "ACDET", "PL612", "Consumo S0"
+  expectedValue String?
+  measuredValue String?
+  unit          String? // V, A, Ω, Estado...
+  status        String? // OK, FUERA DE RANGO, N/A...
 
   @@map("diagnostic_measurements")
+}
+
+// -----------------------------------------------------------------------------
+// 9-BIS. PRUEBAS DE HARDWARE EN LA ENTREGA
+// -----------------------------------------------------------------------------
+
+enum HardwareTestCategory {
+  KEYBOARD
+  CAMERA
+  SOUND
+  DISK
+  PERIPHERALS
+}
+
+enum HardwareTestStatus {
+  PASSED
+  FAILED
+  NOT_APPLICABLE
+}
+
+// Teclado/cámara/sonido se verifican con una herramienta interactiva en el
+// navegador (el técnico abre la app en el equipo del cliente); disco y
+// periféricos no se pueden probar automáticamente por seguridad del
+// navegador, así que son un checklist guiado con la misma estructura
+// (testName libre, igual que DiagnosticMeasurement.pointName, para poder
+// agregar cualquier punto — "Puerto USB 1", "WiFi", "Batería"— sin tocar el
+// esquema). No existe un estado "pendiente" en base de datos: una prueba
+// sin registrar simplemente no tiene fila todavía.
+model HardwareTestResult {
+  id            Int                  @id @default(autoincrement())
+  repairOrderId Int
+  repairOrder   RepairOrder          @relation(fields: [repairOrderId], references: [id])
+  category      HardwareTestCategory
+  testName      String
+  status        HardwareTestStatus
+  notes         String?
+  testedById    Int?
+  testedBy      User?                @relation(fields: [testedById], references: [id])
+  testedAt      DateTime             @default(now())
+
+  @@index([repairOrderId])
+  @@map("hardware_test_results")
 }
 
 // -----------------------------------------------------------------------------
@@ -741,21 +785,21 @@ enum QuotationStatus {
 }
 
 model CustomerQuotation {
-  id             Int              @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   quotationNumber String          @unique
-  customerId     Int
-  customer       Customer         @relation(fields: [customerId], references: [id])
-  sourceOrderId  Int? // si nace de una orden de reparación en diagnóstico
-  sourceOrder    RepairOrder?     @relation("QuotationSourceOrder", fields: [sourceOrderId], references: [id])
-  date           DateTime         @default(now())
-  status         QuotationStatus  @default(DRAFT)
-  subtotal       Decimal          @db.Decimal(12, 2)
-  discount       Decimal          @default(0) @db.Decimal(12, 2)
-  tax            Decimal          @default(0) @db.Decimal(12, 2)
-  shipping       Decimal          @default(0) @db.Decimal(12, 2)
-  total          Decimal          @db.Decimal(12, 2)
-  validUntil     DateTime?
-  notes          String?
+  customerId      Int
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  sourceOrderId   Int? // si nace de una orden de reparación en diagnóstico
+  sourceOrder     RepairOrder?    @relation("QuotationSourceOrder", fields: [sourceOrderId], references: [id])
+  date            DateTime        @default(now())
+  status          QuotationStatus @default(DRAFT)
+  subtotal        Decimal         @db.Decimal(12, 2)
+  discount        Decimal         @default(0) @db.Decimal(12, 2)
+  tax             Decimal         @default(0) @db.Decimal(12, 2)
+  shipping        Decimal         @default(0) @db.Decimal(12, 2)
+  total           Decimal         @db.Decimal(12, 2)
+  validUntil      DateTime?
+  notes           String?
 
   items QuotationItem[]
 
@@ -848,18 +892,18 @@ enum CashRegisterStatus {
 }
 
 model CashRegister {
-  id             Int                 @id @default(autoincrement())
-  openedAt       DateTime            @default(now())
+  id             Int                @id @default(autoincrement())
+  openedAt       DateTime           @default(now())
   closedAt       DateTime?
   openedById     Int
-  openedBy       User                @relation("OpenedBy", fields: [openedById], references: [id])
+  openedBy       User               @relation("OpenedBy", fields: [openedById], references: [id])
   closedById     Int?
-  closedBy       User?               @relation("ClosedBy", fields: [closedById], references: [id])
-  openingAmount  Decimal             @db.Decimal(12, 2)
-  closingAmount  Decimal?            @db.Decimal(12, 2)
-  expectedAmount Decimal?            @db.Decimal(12, 2)
-  difference     Decimal?            @db.Decimal(12, 2)
-  status         CashRegisterStatus  @default(OPEN)
+  closedBy       User?              @relation("ClosedBy", fields: [closedById], references: [id])
+  openingAmount  Decimal            @db.Decimal(12, 2)
+  closingAmount  Decimal?           @db.Decimal(12, 2)
+  expectedAmount Decimal?           @db.Decimal(12, 2)
+  difference     Decimal?           @db.Decimal(12, 2)
+  status         CashRegisterStatus @default(OPEN)
 
   movements CashMovement[]
 
@@ -893,23 +937,23 @@ model CashMovement {
 // -----------------------------------------------------------------------------
 
 model Expense {
-  id            Int           @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   date          DateTime
   category      String
   description   String?
-  amount        Decimal       @db.Decimal(12, 2)
+  amount        Decimal        @db.Decimal(12, 2)
   paymentMethod PaymentMethod?
-  status        RecordStatus  @default(ACTIVE)
+  status        RecordStatus   @default(ACTIVE)
 
   @@map("expenses")
 }
 
 model TaxInvoice {
-  id       Int           @id @default(autoincrement())
-  date     DateTime
+  id            Int           @id @default(autoincrement())
+  date          DateTime
   invoiceNumber String
-  amount   Decimal       @db.Decimal(12, 2)
-  status   PaymentStatus @default(PENDING)
+  amount        Decimal       @db.Decimal(12, 2)
+  status        PaymentStatus @default(PENDING)
 
   @@map("tax_invoices")
 }
@@ -919,16 +963,16 @@ model TaxInvoice {
 // -----------------------------------------------------------------------------
 
 model Attachment {
-  id            Int      @id @default(autoincrement())
+  id            Int               @id @default(autoincrement())
   repairOrderId Int?
-  repairOrder   RepairOrder? @relation("RepairOrderAttachments", fields: [repairOrderId], references: [id])
+  repairOrder   RepairOrder?      @relation("RepairOrderAttachments", fields: [repairOrderId], references: [id])
   // Opcional: si la foto documenta un paso puntual de la bitácora (no solo
   // el estado general del equipo), queda enlazada también a esa entrada
   // específica. Cuando se sube desde una entrada de bitácora, se guarda
   // AMBOS ids (repairOrderId y repairLogId) para que la foto también
   // aparezca en la galería general de la orden, no solo dentro del log.
   repairLogId   Int?
-  repairLog     RepairLog?   @relation("RepairLogAttachments", fields: [repairLogId], references: [id])
+  repairLog     RepairLog?        @relation("RepairLogAttachments", fields: [repairLogId], references: [id])
   // Fotos de un diagnóstico puntual — evidencia del trabajo realizado y el
   // estado final, pensadas para reportarse al cliente (a diferencia de las
   // de bitácora, que son notas técnicas internas). Se guarda también
@@ -941,8 +985,8 @@ model Attachment {
   category      String? // equipo_recibido, daño_fisico, placa, serial, diagnostico, resultado_final...
   description   String?
   uploadedById  Int
-  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
-  uploadedAt    DateTime @default(now())
+  uploadedBy    User              @relation(fields: [uploadedById], references: [id])
+  uploadedAt    DateTime          @default(now())
 
   @@map("attachments")
 }

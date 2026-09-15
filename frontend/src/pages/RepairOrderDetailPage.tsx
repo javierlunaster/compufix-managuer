@@ -9,6 +9,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
 import { ProductSearch } from "@/components/ProductSearch";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { HardwareTestsTab } from "@/components/HardwareTestsTab";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
 import { MeasurementPointSelect } from "@/components/MeasurementPointSelect";
 import {
@@ -30,6 +31,7 @@ const TABS = [
   "Bitácora",
   "Repuestos",
   "Cotizaciones",
+  "Pruebas de entrega",
   "Garantía",
   "Pagos",
   "Historial",
@@ -80,6 +82,7 @@ export function RepairOrderDetailPage() {
       {tab === "Bitácora" && <LogsTab order={order} onChanged={reload} />}
       {tab === "Repuestos" && <PartsTab order={order} onChanged={reload} />}
       {tab === "Cotizaciones" && <QuotationsTab order={order} onChanged={reload} />}
+      {tab === "Pruebas de entrega" && <HardwareTestsTab order={order} onChanged={reload} />}
       {tab === "Garantía" && <WarrantyTab order={order} onChanged={reload} />}
       {tab === "Pagos" && <PaymentsTab order={order} onChanged={reload} />}
       {tab === "Historial" && <HistoryTab order={order} />}
@@ -217,7 +220,11 @@ function Money({ label, value, emphasize }: { label: string; value: string; emph
 function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
-  const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+  // "prueba_camara" (evidencia de la pestaña Pruebas de entrega) tampoco
+  // cuenta como estado de ingreso — se muestra solo dentro de esa pestaña.
+  const intakePhotos = order.photos.filter(
+    (p) => p.category !== "resultado_final" && p.category !== "prueba_camara",
+  );
 
   if (editing) {
     return (
