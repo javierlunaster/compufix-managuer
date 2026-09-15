@@ -6,6 +6,7 @@ import { useFetch } from "@/lib/useFetch";
 import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, DiagnosticMeasurement } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
+import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
 import { ProductSearch } from "@/components/ProductSearch";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
@@ -255,10 +256,8 @@ function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: ()
           </dl>
         </Card>
         <Card>
-          <CardHeader title="Equipo y accesorios" />
+          <CardHeader title="Accesorios y notas" />
           <dl className="space-y-3 p-4 text-sm">
-            <Detail label="Tipo" value={order.device.deviceType?.name} />
-            <Detail label="Serial" value={order.device.serialNumber} />
             <Detail
               label="Accesorios recibidos"
               value={
@@ -277,6 +276,12 @@ function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: ()
           </dl>
         </Card>
       </div>
+
+      <DeviceSpecsCard
+        device={order.device}
+        onUpdated={onChanged}
+        subtitle="Si algún dato no se diligenció al recibir el equipo, se completa o corrige aquí"
+      />
 
       <DevicePasswordCard orderId={order.id} onChanged={onChanged} />
 

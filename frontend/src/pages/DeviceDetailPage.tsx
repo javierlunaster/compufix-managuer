@@ -1,22 +1,10 @@
-import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Brand, Device, DeviceTypeCatalog } from "@/lib/types";
-import { REPAIR_STATUS_LABELS } from "@/lib/types";
+import type { Device } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
-import { DeviceModelDatalist, DEVICE_MODELS_DATALIST_ID } from "@/components/DeviceModelDatalist";
-import {
-  Button,
-  Card,
-  CardHeader,
-  EmptyState,
-  ErrorBanner,
-  Field,
-  Input,
-  Select,
-  Spinner,
-} from "@/components/ui";
+import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
+import { Button, Card, CardHeader, EmptyState, ErrorBanner, Spinner } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 
 export function DeviceDetailPage() {
@@ -26,7 +14,6 @@ export function DeviceDetailPage() {
     () => api.get<Device>(`/devices/${id}`),
     [id],
   );
-  const [editing, setEditing] = useState(false);
 
   async function handleDeactivate() {
     if (!device) return;
@@ -68,41 +55,14 @@ export function DeviceDetailPage() {
             <span className="text-xs uppercase text-danger">Inactivo</span>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setEditing((e) => !e)}>
-            {editing ? "Cancelar" : "Editar"}
+        {device.status !== "INACTIVE" && (
+          <Button variant="danger" onClick={handleDeactivate}>
+            Desactivar
           </Button>
-          {device.status !== "INACTIVE" && (
-            <Button variant="danger" onClick={handleDeactivate}>
-              Desactivar
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
-      {editing ? (
-        <EditDeviceForm
-          device={device}
-          onSaved={() => {
-            setEditing(false);
-            reload();
-          }}
-          onCancel={() => setEditing(false)}
-        />
-      ) : (
-        <Card>
-          <CardHeader title="Ficha técnica" />
-          <dl className="grid grid-cols-2 gap-4 p-4 text-sm">
-            <Detail label="Tipo" value={device.deviceType?.name} />
-            <Detail label="Número de serie" value={device.serialNumber} />
-            <Detail label="Placa" value={device.boardModel} />
-            <Detail label="Procesador" value={device.cpu} />
-            <Detail label="RAM" value={device.ram} />
-            <Detail label="Disco" value={device.disk} />
-            <Detail label="Sistema operativo" value={device.operatingSystem} />
-          </dl>
-        </Card>
-      )}
+      <DeviceSpecsCard device={device} onUpdated={reload} />
 
       <Card>
         <CardHeader
@@ -129,126 +89,5 @@ export function DeviceDetailPage() {
         )}
       </Card>
     </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-ink-muted">{label}</dt>
-      <dd className="text-ink">{value || "—"}</dd>
-    </div>
-  );
-}
-
-function EditDeviceForm({
-  device,
-  onSaved,
-  onCancel,
-}: {
-  device: Device;
-  onSaved: () => void;
-  onCancel: () => void;
-}) {
-  const { data: brands } = useFetch(() => api.get<Brand[]>("/catalogs/brands"), []);
-  const { data: deviceTypes } = useFetch(
-    () => api.get<DeviceTypeCatalog[]>("/catalogs/device-types"),
-    [],
-  );
-
-  const [deviceTypeId, setDeviceTypeId] = useState(String(device.deviceTypeId));
-  const [brandId, setBrandId] = useState(device.brandId ? String(device.brandId) : "");
-  const [model, setModel] = useState(device.model ?? "");
-  const [serialNumber, setSerialNumber] = useState(device.serialNumber ?? "");
-  const [cpu, setCpu] = useState(device.cpu ?? "");
-  const [ram, setRam] = useState(device.ram ?? "");
-  const [disk, setDisk] = useState(device.disk ?? "");
-  const [operatingSystem, setOperatingSystem] = useState(device.operatingSystem ?? "");
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSaving(true);
-    try {
-      await api.patch(`/devices/${device.id}`, {
-        deviceTypeId: Number(deviceTypeId),
-        brandId: brandId ? Number(brandId) : undefined,
-        model: model || undefined,
-        serialNumber: serialNumber || undefined,
-        cpu: cpu || undefined,
-        ram: ram || undefined,
-        disk: disk || undefined,
-        operatingSystem: operatingSystem || undefined,
-      });
-      onSaved();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader title="Editar ficha técnica" />
-      <form onSubmit={handleSubmit} className="space-y-3 p-4">
-        {error && <ErrorBanner message={error} />}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Tipo">
-            <Select value={deviceTypeId} onChange={(e) => setDeviceTypeId(e.target.value)}>
-              {deviceTypes?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Marca">
-            <Select value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-              <option value="">Sin marca</option>
-              {brands?.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Modelo">
-            <Input value={model} onChange={(e) => setModel(e.target.value)} list={DEVICE_MODELS_DATALIST_ID} />
-            <DeviceModelDatalist brandId={brandId} deviceTypeId={deviceTypeId} />
-          </Field>
-          <Field label="Número de serie">
-            <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Procesador">
-            <Input value={cpu} onChange={(e) => setCpu(e.target.value)} />
-          </Field>
-          <Field label="RAM">
-            <Input value={ram} onChange={(e) => setRam(e.target.value)} />
-          </Field>
-          <Field label="Disco">
-            <Input value={disk} onChange={(e) => setDisk(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Sistema operativo">
-          <Input value={operatingSystem} onChange={(e) => setOperatingSystem(e.target.value)} />
-        </Field>
-        <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? "Guardando…" : "Guardar cambios"}
-          </Button>
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancelar
-          </Button>
-        </div>
-      </form>
-    </Card>
   );
 }
