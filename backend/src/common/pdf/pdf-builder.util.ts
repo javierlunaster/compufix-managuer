@@ -111,25 +111,43 @@ export class PdfBuilder {
     // encima de esta.
     for (let i = 0; i < pairs.length; i += 2) {
       const row = pairs.slice(i, i + 2);
-      const rowStartY = this.doc.y;
-      let rowHeight = 0;
+      const width = colWidth - colGap;
 
-      row.forEach(([label, value], col) => {
-        const x = 50 + col * (colWidth + colGap);
-        const width = colWidth - colGap;
+      // Primera pasada: solo medir (sin escribir nada todavía). Antes esto
+      // se hacía columna por columna, midiendo y escribiendo esa misma
+      // columna antes de pasar a la siguiente — si la etiqueta de la
+      // primera columna cabía justo al borde de la página pero su valor
+      // ya no, el `.text()` del valor disparaba su propio salto de
+      // página automático de PDFKit, dejando la etiqueta en una hoja y el
+      // valor en la siguiente. Al medir TODA la fila primero se sabe su
+      // altura real antes de decidir si hace falta saltar de página.
+      const cells = row.map(([label, value]) => {
         const safeLabel = sanitizeForPdf(label).toUpperCase();
-
         this.doc.fontSize(8);
         const labelHeight = this.doc.heightOfString(safeLabel, { width });
-        this.doc.fillColor("#6b7280").text(safeLabel, x, rowStartY, { width });
 
         const valueText = value ? sanitizeForPdf(value) : "—";
-        const valueY = rowStartY + labelHeight + 2;
         this.doc.fontSize(10);
         const valueHeight = this.doc.heightOfString(valueText, { width });
-        this.doc.fillColor("#111827").text(valueText, x, valueY, { width });
 
-        rowHeight = Math.max(rowHeight, labelHeight + 2 + valueHeight);
+        return { safeLabel, valueText, labelHeight, valueHeight };
+      });
+
+      const rowHeight = Math.max(...cells.map((c) => c.labelHeight + 2 + c.valueHeight));
+
+      if (this.doc.y + rowHeight > this.doc.page.height - 80) {
+        this.doc.addPage();
+        this.doc.y = 50;
+      }
+      const rowStartY = this.doc.y;
+
+      cells.forEach(({ safeLabel, valueText, labelHeight }, col) => {
+        const x = 50 + col * (colWidth + colGap);
+
+        this.doc.fontSize(8).fillColor("#6b7280").text(safeLabel, x, rowStartY, { width });
+
+        const valueY = rowStartY + labelHeight + 2;
+        this.doc.fontSize(10).fillColor("#111827").text(valueText, x, valueY, { width });
       });
 
       this.doc.y = rowStartY + rowHeight + 8;
@@ -150,7 +168,22 @@ export class PdfBuilder {
     const usableWidth = this.doc.page.width - 100;
     const widths = columnWidths ?? headers.map(() => usableWidth / headers.length);
     const startX = 50;
+    const headerHeight = 14;
     let y = this.doc.y + 4;
+
+    // Si el encabezado no cabe en lo que queda de página, se salta ANTES
+    // de escribirlo. Sin este chequeo, cuando `y` ya queda fuera del área
+    // imprimible (ej. justo después de un título de sección que llegó al
+    // borde inferior), cada celda del encabezado se escribe con su propio
+    // x/y absoluto — PDFKit no sabe que "Fecha" y "Procedimiento" debían
+    // quedar en la misma fila, así que pagina cada `.text()` por su
+    // cuenta: una hoja casi en blanco con solo "FECHA", otra con solo
+    // "PROCEDIMIENTO", y recién en la siguiente aparecen las filas reales.
+    if (y + headerHeight > this.doc.page.height - 80) {
+      this.doc.addPage();
+      y = 50;
+    }
+
     const safeHeaders = headers.map((h) => sanitizeForPdf(h));
     const safeRows = rows.map((row) => row.map((cell) => sanitizeForPdf(cell)));
 
@@ -160,7 +193,7 @@ export class PdfBuilder {
       this.doc.text(h.toUpperCase(), x, y, { width: widths[i] });
       x += widths[i];
     });
-    y += 14;
+    y += headerHeight;
     this.doc
       .moveTo(startX, y - 3)
       .lineTo(startX + usableWidth, y - 3)
