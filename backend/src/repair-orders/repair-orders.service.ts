@@ -15,6 +15,8 @@ import { UpdateRepairOrderDto } from "./dto/update-repair-order.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
 import { AssignTechnicianDto } from "./dto/assign-technician.dto";
 import { AddProcedureDto } from "./dto/add-procedure.dto";
+import { MailService } from "../mail/mail.service";
+import { formatCurrency } from "../common/utils/format.util";
 
 // Incluye estándar para el "expediente técnico" (sección 30 del brief).
 // Deliberadamente NO selecciona devicePasswordEncrypted: esa contraseña
@@ -89,6 +91,7 @@ export class RepairOrdersService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private mail: MailService,
   ) {}
 
   /**
@@ -212,7 +215,17 @@ export class RepairOrdersService {
       newValue: { orderCode: order.orderCode, customerId: order.customerId },
     });
 
-    return this.findOne(order.id);
+    const full = await this.findOne(order.id);
+
+    await this.mail.sendOrderReceived({
+      to: full.customer.email,
+      customerName: full.customer.fullName,
+      orderCode: full.orderCode,
+      deviceLabel: `${full.device.brand?.name ?? ""} ${full.device.model ?? ""}`.trim(),
+      reportedIssue: full.reportedIssue,
+    });
+
+    return full;
   }
 
   /**
@@ -346,7 +359,19 @@ export class RepairOrdersService {
       newValue: { status: order.status },
     });
 
-    return this.findOne(id);
+    const full = await this.findOne(id);
+
+    if (dto.newStatus === RepairStatus.READY_FOR_PICKUP) {
+      await this.mail.sendOrderReady({
+        to: full.customer.email,
+        customerName: full.customer.fullName,
+        orderCode: full.orderCode,
+        deviceLabel: `${full.device.brand?.name ?? ""} ${full.device.model ?? ""}`.trim(),
+        balance: formatCurrency(full.balance),
+      });
+    }
+
+    return full;
   }
 
   async assignTechnician(id: number, dto: AssignTechnicianDto, actingUserId: number) {

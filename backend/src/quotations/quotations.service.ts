@@ -8,13 +8,15 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairPartsService } from "../repair-parts/repair-parts.service";
 import { normalizeName } from "../common/utils/normalize-name.util";
+import { MailService } from "../mail/mail.service";
+import { formatCurrency } from "../common/utils/format.util";
 import { CreateQuotationDto } from "./dto/create-quotation.dto";
 import { UpdateQuotationDto } from "./dto/update-quotation.dto";
 import { UpdateQuotationStatusDto } from "./dto/update-quotation-status.dto";
 import { CreateQuotationItemDto } from "./dto/create-quotation-item.dto";
 
 const QUOTATION_DETAIL_INCLUDE = {
-  customer: { select: { id: true, fullName: true, phone: true } },
+  customer: { select: { id: true, fullName: true, phone: true, email: true } },
   sourceOrder: { select: { id: true, orderCode: true, status: true } },
   items: {
     include: {
@@ -41,6 +43,7 @@ export class QuotationsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private repairParts: RepairPartsService,
+    private mail: MailService,
   ) {}
 
   async create(dto: CreateQuotationDto, actingUserId: number) {
@@ -346,7 +349,18 @@ export class QuotationsService {
       newValue: { status: updated.status },
     });
 
-    return this.findOne(id);
+    const full = await this.findOne(id);
+
+    if (dto.newStatus === QuotationStatus.SENT) {
+      await this.mail.sendQuotationSent({
+        to: full.customer.email,
+        customerName: full.customer.fullName,
+        quotationNumber: full.quotationNumber,
+        total: formatCurrency(full.total),
+      });
+    }
+
+    return full;
   }
 
   /**
