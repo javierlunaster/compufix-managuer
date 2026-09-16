@@ -271,6 +271,8 @@ export type RepairOrderDetail = {
   photos: Attachment[];
   warranties: Warranty[];
   hardwareTestResults: HardwareTestResult[];
+  customerSignatureUrl?: string | null;
+  customerSignatureDate?: string | null;
 };
 
 export type HardwareTestCategory = "KEYBOARD" | "CAMERA" | "SOUND" | "DISK" | "PERIPHERALS";

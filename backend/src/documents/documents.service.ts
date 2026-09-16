@@ -322,7 +322,15 @@ export class DocumentsService {
     }
 
     pdf.spacer(40);
-    pdf.signatureLine("Firma de recibido a satisfacción — Cliente");
+    if (order.customerSignatureUrl) {
+      const signatureBuffer = await this.fetchPhotoBuffer(order.customerSignatureUrl);
+      pdf.signatureImage(
+        signatureBuffer,
+        `Firma de recibido a satisfacción — Cliente · Firmado el ${formatDateTime(order.customerSignatureDate!)}`,
+      );
+    } else {
+      pdf.signatureLine("Firma de recibido a satisfacción — Cliente");
+    }
 
     pdf.footer(`${BUSINESS_NAME} · Comprobante de entrega · Orden ${order.orderCode}`);
 

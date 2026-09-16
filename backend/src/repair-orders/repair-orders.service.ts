@@ -16,6 +16,7 @@ import { UpdateStatusDto } from "./dto/update-status.dto";
 import { AssignTechnicianDto } from "./dto/assign-technician.dto";
 import { AddProcedureDto } from "./dto/add-procedure.dto";
 import { MailService } from "../mail/mail.service";
+import { StorageService } from "../storage/storage.service";
 import { formatCurrency } from "../common/utils/format.util";
 
 // Incluye estándar para el "expediente técnico" (sección 30 del brief).
@@ -92,6 +93,7 @@ export class RepairOrdersService {
     private prisma: PrismaService,
     private audit: AuditService,
     private mail: MailService,
+    private storage: StorageService,
   ) {}
 
   /**
@@ -467,6 +469,68 @@ export class RepairOrdersService {
     });
 
     return { message: "Contraseña del equipo eliminada" };
+  }
+
+  /**
+   * Firma digital del cliente al recibir el equipo — agiliza la entrega y
+   * ahorra papel (antes era una línea en blanco en el PDF que había que
+   * imprimir y firmar a mano). Una sola firma por orden: volver a firmar
+   * sobrescribe la anterior y borra el archivo viejo de Storage para no
+   * dejar basura acumulándose (no se conserva historial de firmas
+   * previas, a diferencia de las fotos — no tiene el mismo valor
+   * probatorio conservar un intento fallido o una firma de prueba).
+   */
+  async setSignature(id: number, file: Express.Multer.File, actingUserId: number) {
+    const order = await this.ensureExists(id);
+
+    if (!file) {
+      throw new BadRequestException("Sube la imagen de la firma");
+    }
+
+    const uploaded = await this.storage.upload(file, `repair-orders/${id}/signature`);
+
+    await this.prisma.repairOrder.update({
+      where: { id },
+      data: {
+        customerSignatureUrl: uploaded.publicUrl,
+        customerSignatureDate: new Date(),
+      },
+    });
+
+    if (order.customerSignatureUrl) {
+      await this.storage.remove(this.storage.pathFromPublicUrl(order.customerSignatureUrl));
+    }
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "SET_SIGNATURE",
+      entityType: "RepairOrder",
+      entityId: id,
+    });
+
+    return this.findOne(id);
+  }
+
+  async clearSignature(id: number, actingUserId: number) {
+    const order = await this.ensureExists(id);
+
+    if (order.customerSignatureUrl) {
+      await this.storage.remove(this.storage.pathFromPublicUrl(order.customerSignatureUrl));
+    }
+
+    await this.prisma.repairOrder.update({
+      where: { id },
+      data: { customerSignatureUrl: null, customerSignatureDate: null },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "CLEAR_SIGNATURE",
+      entityType: "RepairOrder",
+      entityId: id,
+    });
+
+    return this.findOne(id);
   }
 
   /**

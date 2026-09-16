@@ -8,7 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { RepairStatus } from "@prisma/client";
 import { RepairOrdersService } from "./repair-orders.service";
 import { CreateRepairOrderDto } from "./dto/create-repair-order.dto";
@@ -16,6 +19,7 @@ import { UpdateRepairOrderDto } from "./dto/update-repair-order.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
 import { AssignTechnicianDto } from "./dto/assign-technician.dto";
 import { AddProcedureDto } from "./dto/add-procedure.dto";
+import { photoUploadOptions } from "../attachments/multer.config";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 
@@ -141,6 +145,27 @@ export class RepairOrdersController {
   ) {
     await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
     return this.repairOrdersService.purgeDevicePassword(id, actingUser.id);
+  }
+
+  // Firma digital del cliente en la entrega — ver docstring del service.
+  @Post(":id/signature")
+  @UseInterceptors(FileInterceptor("file", photoUploadOptions))
+  async setSignature(
+    @Param("id", ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
+    return this.repairOrdersService.setSignature(id, file, actingUser.id);
+  }
+
+  @Delete(":id/signature")
+  async clearSignature(
+    @Param("id", ParseIntPipe) id: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    await this.repairOrdersService.assertTechnicianAccess(actingUser, id);
+    return this.repairOrdersService.clearSignature(id, actingUser.id);
   }
 
   // Corrección de datos (no un flujo normal): reemplaza totalValue por la

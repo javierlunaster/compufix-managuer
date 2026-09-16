@@ -325,6 +325,56 @@ export class PdfBuilder {
     return this;
   }
 
+  /**
+   * Firma capturada en pantalla al momento de la entrega (comprobante de
+   * entrega) — reemplaza la línea en blanco de signatureLine() por la
+   * imagen real cuando el cliente ya firmó digitalmente, para no
+   * imprimir un espacio que de todas formas nadie va a firmar a mano.
+   * Si `imageBuffer` es null (descarga fallida, o el cliente todavía no
+   * firmó), cae de vuelta en signatureLine() — nunca rompe el documento
+   * por esto, mismo criterio que photoGrid() con una foto no disponible.
+   *
+   * Chequeo de salto de página ANTES de dibujar, mismo motivo que el
+   * resto de PdfBuilder (ver table()): sin esto, si el bloque no cabe en
+   * lo que queda de página, la imagen y el texto de abajo podrían quedar
+   * separados en hojas distintas.
+   */
+  signatureImage(imageBuffer: Buffer | null, caption: string) {
+    if (!imageBuffer) {
+      return this.signatureLine(caption);
+    }
+
+    const imgWidth = 180;
+    const imgHeight = 70;
+    const blockHeight = imgHeight + 26;
+
+    if (this.doc.y + blockHeight > this.doc.page.height - 80) {
+      this.doc.addPage();
+      this.doc.y = 50;
+    }
+
+    const startX = 50;
+    const startY = this.doc.y;
+
+    try {
+      this.doc.image(imageBuffer, startX, startY, { fit: [imgWidth, imgHeight] });
+    } catch {
+      // Imagen corrupta o formato no soportado — se deja el espacio en
+      // blanco con la línea y el texto igual, en vez de romper todo el PDF.
+    }
+
+    const lineY = startY + imgHeight + 4;
+    this.doc.moveTo(startX, lineY).lineTo(startX + imgWidth, lineY).strokeColor("#9ca3af").stroke();
+    this.doc
+      .fontSize(9)
+      .fillColor("#6b7280")
+      .text(sanitizeForPdf(caption), startX, lineY + 4, { width: imgWidth + 60 });
+
+    this.doc.y = lineY + 4 + 14;
+    this.doc.x = this.doc.page.margins.left;
+    return this;
+  }
+
   footer(text: string) {
     const safeText = sanitizeForPdf(text);
     const range = this.doc.bufferedPageRange();

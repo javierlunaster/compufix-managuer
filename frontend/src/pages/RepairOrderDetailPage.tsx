@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, DiagnosticMeasurement } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
@@ -10,6 +10,7 @@ import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
 import { ProductSearch } from "@/components/ProductSearch";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { HardwareTestsTab } from "@/components/HardwareTestsTab";
+import { SignaturePad } from "@/components/SignaturePad";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
 import { MeasurementPointSelect } from "@/components/MeasurementPointSelect";
 import {
@@ -322,6 +323,8 @@ function InfoTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: ()
         </div>
       </Card>
 
+      <SignatureCard order={order} onChanged={onChanged} />
+
       <Card>
         <CardHeader title="Documentos" subtitle="Listos para enviar al cliente" />
         <div className="flex flex-wrap gap-3 p-4">
@@ -534,6 +537,79 @@ function DevicePasswordCard({ orderId, onChanged }: { orderId: number; onChanged
             Eliminar (tras la entrega)
           </Button>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Firma digital del cliente en la entrega — agiliza la entrega y ahorra
+ * papel: reemplaza la línea en blanco que había que imprimir y firmar a
+ * mano en el comprobante de entrega (ver PdfBuilder.signatureImage).
+ */
+function SignatureCard({
+  order,
+  onChanged,
+}: {
+  order: RepairOrderDetail;
+  onChanged: () => void;
+}) {
+  const [redoing, setRedoing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleClear() {
+    if (!confirm("¿Quitar la firma guardada? El cliente tendría que volver a firmar.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete(`/repair-orders/${order.id}/signature`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo quitar la firma");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Firma del cliente"
+        subtitle="Se incluye en el comprobante de entrega — evita imprimir y firmar en papel"
+        action={
+          order.customerSignatureUrl && !redoing ? (
+            <Button variant="secondary" onClick={() => setRedoing(true)}>
+              Volver a firmar
+            </Button>
+          ) : null
+        }
+      />
+      <div className="space-y-3 p-4">
+        {error && <ErrorBanner message={error} />}
+        {order.customerSignatureUrl && !redoing ? (
+          <div className="space-y-2">
+            <img
+              src={resolvePhotoUrl(order.customerSignatureUrl)}
+              alt="Firma del cliente"
+              className="h-28 rounded border border-border bg-white object-contain p-2"
+            />
+            <p className="text-xs text-ink-muted">
+              Firmado el {order.customerSignatureDate ? formatDateTime(order.customerSignatureDate) : "—"}
+            </p>
+            <Button type="button" variant="danger" onClick={handleClear} disabled={busy}>
+              Quitar firma
+            </Button>
+          </div>
+        ) : (
+          <SignaturePad
+            orderId={order.id}
+            onSaved={() => {
+              setRedoing(false);
+              onChanged();
+            }}
+          />
+        )}
       </div>
     </Card>
   );

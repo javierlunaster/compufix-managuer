@@ -552,6 +552,15 @@ model RepairOrder {
   notes        String?
   recordStatus RecordStatus @default(ACTIVE)
 
+  // Firma digital del cliente en la entrega — reemplaza la línea en blanco
+  // del comprobante impreso (agiliza la entrega y ahorra papel). Se guarda
+  // como imagen en Supabase Storage, igual que las fotos (RepairOrdersService
+  // usa StorageService directo, no pasa por el modelo Attachment porque es
+  // 1 sola firma por orden, no una galería). `null` = todavía sin firmar;
+  // volver a firmar sobrescribe la anterior, no se conserva historial.
+  customerSignatureUrl  String?
+  customerSignatureDate DateTime?
+
   statusHistory       RepairStatusHistory[]
   diagnostics         RepairDiagnostic[]
   logs                RepairLog[]
