@@ -2,6 +2,15 @@ import { Injectable, InternalServerErrorException, OnModuleInit } from "@nestjs/
 import { StorageClient } from "@supabase/storage-js";
 import { randomUUID } from "crypto";
 import { extname } from "path";
+import sharp from "sharp";
+
+// Una foto de celular moderna pesa varios MB y mide miles de píxeles de
+// lado — muy por encima de lo que hace falta para verse en pantalla o
+// imprimirse en un PDF tamaño carta. Bajarla a 1920px del lado más largo
+// y recomprimir a JPEG calidad 80 reduce el peso típico entre 80-95% sin
+// pérdida visible, ahorrando espacio en el plan de Supabase Storage.
+const MAX_IMAGE_DIMENSION_PX = 1920;
+const JPEG_QUALITY = 80;
 
 /**
  * Capa de almacenamiento de archivos — reemplaza el disco local (Fase 1-15)
@@ -48,16 +57,58 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
+   * Redimensiona y recomprime una foto antes de subirla (ver constantes
+   * arriba). Siempre normaliza a JPEG sin importar el formato de origen
+   * (PNG/WEBP/GIF) — para fotos de cámara, JPEG comprime muchísimo mejor
+   * que PNG y aquí nunca hace falta transparencia. `.rotate()` sin
+   * argumentos lee la orientación EXIF UNA vez para girar los píxeles
+   * correctamente antes de que sharp descarte el resto de los metadatos
+   * al recomprimir (efecto colateral bueno: tampoco se filtra ubicación
+   * GPS u otros datos EXIF de la foto original).
+   *
+   * Si sharp no puede procesar el archivo (formato raro, corrupto), se
+   * sube tal cual llegó — nunca bloquea la evidencia del técnico por un
+   * problema de compresión.
+   */
+  private async compressIfImage(
+    file: Express.Multer.File,
+  ): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+    if (!file.mimetype.startsWith("image/")) {
+      return { buffer: file.buffer, contentType: file.mimetype, extension: extname(file.originalname) };
+    }
+
+    try {
+      const buffer = await sharp(file.buffer)
+        .rotate()
+        .resize({
+          width: MAX_IMAGE_DIMENSION_PX,
+          height: MAX_IMAGE_DIMENSION_PX,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+        .toBuffer();
+      return { buffer, contentType: "image/jpeg", extension: ".jpg" };
+    } catch {
+      return { buffer: file.buffer, contentType: file.mimetype, extension: extname(file.originalname) };
+    }
+  }
+
+  /**
    * Sube un archivo y devuelve su URL pública. `folder` agrupa los
    * archivos dentro del bucket (ej. "repair-orders/42") solo para que el
    * bucket sea navegable a simple vista desde el dashboard de Supabase —
    * no se usa para ninguna lógica del sistema.
    */
-  async upload(file: Express.Multer.File, folder: string): Promise<{ path: string; publicUrl: string }> {
-    const path = `${folder}/${randomUUID()}${extname(file.originalname)}`;
+  async upload(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<{ path: string; publicUrl: string; contentType: string }> {
+    const { buffer, contentType, extension } = await this.compressIfImage(file);
+    const path = `${folder}/${randomUUID()}${extension}`;
 
-    const { error } = await this.client.from(this.bucket).upload(path, file.buffer, {
-      contentType: file.mimetype,
+    const { error } = await this.client.from(this.bucket).upload(path, buffer, {
+      contentType,
       upsert: false,
     });
 
@@ -66,7 +117,7 @@ export class StorageService implements OnModuleInit {
     }
 
     const { data } = this.client.from(this.bucket).getPublicUrl(path);
-    return { path, publicUrl: data.publicUrl };
+    return { path, publicUrl: data.publicUrl, contentType };
   }
 
   /**

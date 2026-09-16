@@ -100,7 +100,11 @@ export class AttachmentsService {
             repairLogId: ids.repairLogId,
             diagnosticId: ids.diagnosticId,
             fileUrl: uploaded[i].publicUrl,
-            fileType: file.mimetype,
+            // El tipo que realmente queda guardado (siempre JPEG si era una
+            // imagen, ver StorageService.compressIfImage), no el que llegó
+            // en la subida original — si no, `fileType` en la base de datos
+            // quedaría desincronizado con el archivo real en Storage.
+            fileType: uploaded[i].contentType,
             category: dto.category,
             description: dto.description,
             uploadedById: actingUserId,
