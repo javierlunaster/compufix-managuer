@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { portalApi, PortalApiError, resolvePhotoUrl } from "@/lib/portalApi";
 import type { PortalOrderDetail } from "@/lib/types";
-import { WARRANTY_STATUS_LABELS, PAYMENT_METHOD_LABELS, QUOTATION_STATUS_LABELS } from "@/lib/types";
+import {
+  WARRANTY_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  QUOTATION_STATUS_LABELS,
+  HARDWARE_TEST_CATEGORY_LABELS,
+  HARDWARE_TEST_STATUS_LABELS,
+} from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { Card, CardHeader, ErrorBanner, Spinner } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -42,7 +48,13 @@ export function PortalOrderDetailPage() {
 
   const balance = Number(order.totalValue) - Number(order.paidAmount);
   const deliveryPhotos = order.photos.filter((p) => p.category === "resultado_final");
-  const intakePhotos = order.photos.filter((p) => p.category !== "resultado_final");
+  // "prueba_camara" (evidencia de la prueba de cámara antes de la entrega)
+  // tampoco cuenta como estado de ingreso — se muestra en su propia
+  // sección de pruebas realizadas, más abajo.
+  const intakePhotos = order.photos.filter(
+    (p) => p.category !== "resultado_final" && p.category !== "prueba_camara",
+  );
+  const hardwareTestPhotos = order.photos.filter((p) => p.category === "prueba_camara");
 
   return (
     <div className="space-y-4">
@@ -255,6 +267,52 @@ export function PortalOrderDetailPage() {
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {order.hardwareTestResults.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Pruebas realizadas antes de la entrega"
+            subtitle="Teclado, cámara, sonido y demás verificaciones hechas al equipo"
+          />
+          <ul className="divide-y divide-border">
+            {order.hardwareTestResults.map((t) => (
+              <li key={t.id} className="px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-ink">
+                    {HARDWARE_TEST_CATEGORY_LABELS[t.category]}
+                    {t.testName !== HARDWARE_TEST_CATEGORY_LABELS[t.category] ? ` · ${t.testName}` : ""}
+                  </span>
+                  <span
+                    className={
+                      t.status === "PASSED"
+                        ? "text-xs font-semibold uppercase tracking-wide text-success"
+                        : t.status === "FAILED"
+                          ? "text-xs font-semibold uppercase tracking-wide text-danger"
+                          : "text-xs font-semibold uppercase tracking-wide text-ink-muted"
+                    }
+                  >
+                    {HARDWARE_TEST_STATUS_LABELS[t.status]}
+                  </span>
+                </div>
+                {t.notes && <p className="mt-1 text-ink-muted">{t.notes}</p>}
+              </li>
+            ))}
+          </ul>
+          {hardwareTestPhotos.length > 0 && (
+            <div className="flex flex-wrap gap-2 border-t border-border p-4">
+              {hardwareTestPhotos.map((p) => (
+                <a key={p.id} href={resolvePhotoUrl(p.fileUrl)} target="_blank" rel="noreferrer">
+                  <img
+                    src={resolvePhotoUrl(p.fileUrl)}
+                    alt="Evidencia de prueba de cámara"
+                    className="h-20 w-20 rounded border border-border object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 

@@ -187,6 +187,14 @@ export class CustomerPortalService {
           },
           orderBy: { date: "desc" },
         },
+        // Pruebas de hardware antes de la entrega (teclado, cámara, sonido,
+        // disco, periféricos — ver hardware-tests module) — mismo respaldo
+        // que ya se imprime en el comprobante de entrega, ahora también
+        // visible en el portal.
+        hardwareTestResults: {
+          select: { id: true, category: true, testName: true, status: true, notes: true, testedAt: true },
+          orderBy: { testedAt: "asc" },
+        },
         // NUNCA se seleccionan: devicePasswordEncrypted, notes (notas
         // internas del técnico sobre la orden), ni ningún dato de
         // costo/margen.

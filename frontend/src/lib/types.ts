@@ -629,4 +629,12 @@ export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {
     warrantyEndDate: string;
     status: WarrantyStatus;
   }[];
+  hardwareTestResults: {
+    id: number;
+    category: HardwareTestCategory;
+    testName: string;
+    status: HardwareTestStatus;
+    notes?: string | null;
+    testedAt: string;
+  }[];
 };
