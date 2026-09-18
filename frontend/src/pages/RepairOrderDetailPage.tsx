@@ -603,7 +603,11 @@ function SignatureCard({
           </div>
         ) : (
           <SignaturePad
-            orderId={order.id}
+            onSave={async (blob) => {
+              const formData = new FormData();
+              formData.append("file", blob, "firma.png");
+              await api.postForm(`/repair-orders/${order.id}/signature`, formData);
+            }}
             onSaved={() => {
               setRedoing(false);
               onChanged();

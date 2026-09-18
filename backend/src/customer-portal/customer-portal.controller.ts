@@ -1,6 +1,18 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Body, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Body,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Throttle } from "@nestjs/throttler";
 import { Public } from "../common/decorators/public.decorator";
+import { photoUploadOptions } from "../attachments/multer.config";
 import { CustomerPortalService } from "./customer-portal.service";
 import { CustomerPortalLoginDto } from "./dto/customer-portal-login.dto";
 import { CustomerJwtAuthGuard } from "./customer-jwt-auth.guard";
@@ -57,6 +69,17 @@ export class CustomerPortalController {
     @Param("id", ParseIntPipe) quotationId: number,
   ) {
     return this.customerPortalService.findMyQuotationDetail(customer.id, quotationId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-orders/:id/signature")
+  @UseInterceptors(FileInterceptor("file", photoUploadOptions))
+  signMyOrder(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) orderId: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.customerPortalService.signMyOrder(customer.id, orderId, file);
   }
 
   @UseGuards(CustomerJwtAuthGuard)

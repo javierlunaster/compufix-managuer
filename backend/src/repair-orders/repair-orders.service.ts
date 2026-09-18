@@ -479,8 +479,15 @@ export class RepairOrdersService {
    * dejar basura acumulándose (no se conserva historial de firmas
    * previas, a diferencia de las fotos — no tiene el mismo valor
    * probatorio conservar un intento fallido o una firma de prueba).
+   *
+   * Compartido entre dos rutas de entrada: el personal (setSignature,
+   * con auditoría) y el propio cliente firmando desde el portal
+   * (setSignatureByCustomer, ver CustomerPortalService.signMyOrder —
+   * sin auditoría porque un cliente no es un User del sistema, no hay a
+   * quién atribuirle la entrada en AuditLog; la evidencia de cuándo
+   * ocurrió queda en customerSignatureDate).
    */
-  async setSignature(id: number, file: Express.Multer.File, actingUserId: number) {
+  private async uploadSignature(id: number, file: Express.Multer.File) {
     const order = await this.ensureExists(id);
 
     if (!file) {
@@ -501,6 +508,12 @@ export class RepairOrdersService {
       await this.storage.remove(this.storage.pathFromPublicUrl(order.customerSignatureUrl));
     }
 
+    return this.findOne(id);
+  }
+
+  async setSignature(id: number, file: Express.Multer.File, actingUserId: number) {
+    const result = await this.uploadSignature(id, file);
+
     await this.audit.log({
       userId: actingUserId,
       action: "SET_SIGNATURE",
@@ -508,7 +521,11 @@ export class RepairOrdersService {
       entityId: id,
     });
 
-    return this.findOne(id);
+    return result;
+  }
+
+  setSignatureByCustomer(id: number, file: Express.Multer.File) {
+    return this.uploadSignature(id, file);
   }
 
   async clearSignature(id: number, actingUserId: number) {

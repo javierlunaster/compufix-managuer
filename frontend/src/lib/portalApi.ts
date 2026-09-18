@@ -62,10 +62,44 @@ async function portalRequest<T>(
   return payload as T;
 }
 
+// Aparte de portalRequest (que siempre manda JSON) porque un archivo va
+// como FormData, sin el header Content-Type manual — el navegador arma
+// el boundary del multipart solo, y ponerlo a mano lo rompe. Mismo
+// patrón que requestForm() en lib/api.ts para el personal.
+async function portalRequestForm<T>(path: string, formData: FormData): Promise<T> {
+  const token = getPortalToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(API_BASE_URL + path, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      (payload && typeof payload === "object" && "message" in payload
+        ? String((payload as { message: unknown }).message)
+        : null) ?? `Error ${response.status}`;
+    if (response.status === 401) {
+      clearPortalToken();
+    }
+    throw new PortalApiError(response.status, message);
+  }
+
+  return payload as T;
+}
+
 export { API_ORIGIN, resolvePhotoUrl };
 
 export const portalApi = {
   get: <T>(path: string) => portalRequest<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown) => portalRequest<T>(path, { method: "POST", body }),
   patch: <T>(path: string, body?: unknown) => portalRequest<T>(path, { method: "PATCH", body }),
+  postForm: <T>(path: string, formData: FormData) => portalRequestForm<T>(path, formData),
 };

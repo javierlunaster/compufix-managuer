@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { portalApi, PortalApiError, resolvePhotoUrl } from "@/lib/portalApi";
 import type { PortalOrderDetail } from "@/lib/types";
@@ -10,15 +10,16 @@ import {
   HARDWARE_TEST_STATUS_LABELS,
 } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
+import { SignaturePad } from "@/components/SignaturePad";
 import { Card, CardHeader, ErrorBanner, Spinner } from "@/components/ui";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 
 export function PortalOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<PortalOrderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     portalApi
       .get<PortalOrderDetail>(`/customer-portal/my-orders/${id}`)
       .then(setOrder)
@@ -26,6 +27,10 @@ export function PortalOrderDetailPage() {
         setError(err instanceof PortalApiError ? err.message : "No se pudo cargar esta reparación"),
       );
   }, [id]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   if (error) {
     return (
@@ -380,6 +385,65 @@ export function PortalOrderDetailPage() {
           </ul>
         </Card>
       )}
+
+      <SignatureSection order={order} onSigned={reload} />
     </div>
+  );
+}
+
+const SIGNABLE_STATUSES = ["READY_FOR_PICKUP", "DELIVERED"];
+
+/**
+ * Firma de recibido a satisfacción desde el propio portal — evita que el
+ * taller tenga que imprimir el comprobante y pedir una firma en papel.
+ * Solo se puede firmar una vez (ver customer-portal.service.ts) y solo
+ * cuando el equipo ya está listo para entregar o ya se marcó como
+ * entregado; en cualquier otro estado se muestra igual, pero sin la
+ * herramienta de firma, para que el cliente sepa que existe y cuándo se
+ * habilita.
+ */
+function SignatureSection({
+  order,
+  onSigned,
+}: {
+  order: PortalOrderDetail;
+  onSigned: () => void;
+}) {
+  const canSign = SIGNABLE_STATUSES.includes(order.status);
+
+  return (
+    <Card>
+      <CardHeader
+        title="Firma de entrega"
+        subtitle="Confirma que recibiste el equipo a satisfacción — queda como evidencia de la entrega"
+      />
+      <div className="space-y-3 p-4">
+        {order.customerSignatureUrl ? (
+          <div className="space-y-2">
+            <img
+              src={resolvePhotoUrl(order.customerSignatureUrl)}
+              alt="Tu firma"
+              className="h-28 rounded border border-border bg-white object-contain p-2"
+            />
+            <p className="text-xs text-ink-muted">
+              Firmado el {order.customerSignatureDate ? formatDateTime(order.customerSignatureDate) : "—"}
+            </p>
+          </div>
+        ) : canSign ? (
+          <SignaturePad
+            onSave={async (blob) => {
+              const formData = new FormData();
+              formData.append("file", blob, "firma.png");
+              await portalApi.postForm(`/customer-portal/my-orders/${order.id}/signature`, formData);
+            }}
+            onSaved={onSigned}
+          />
+        ) : (
+          <p className="text-sm text-ink-muted">
+            Podrás firmar la entrega aquí cuando tu equipo esté listo para recoger.
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }

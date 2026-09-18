@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { QuotationStatus } from "@prisma/client";
+import { QuotationStatus, RepairStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { RepairOrdersService } from "../repair-orders/repair-orders.service";
 import { CustomerPortalLoginDto } from "./dto/customer-portal-login.dto";
 
 @Injectable()
@@ -9,6 +10,7 @@ export class CustomerPortalService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private repairOrders: RepairOrdersService,
   ) {}
 
   /**
@@ -92,6 +94,8 @@ export class CustomerPortalService {
         mouseReceived: true,
         totalValue: true,
         paidAmount: true,
+        customerSignatureUrl: true,
+        customerSignatureDate: true,
         device: {
           select: {
             model: true,
@@ -309,5 +313,43 @@ export class CustomerPortalService {
       where: { id: quotationId },
       data: { status: QuotationStatus.REJECTED },
     });
+  }
+
+  // Firmar "recibido a satisfacción" solo tiene sentido cuando el equipo
+  // ya está listo para entregar (o ya se marcó como entregado) — antes de
+  // eso le quitaría valor a la firma como evidencia real de la entrega.
+  private readonly SIGNABLE_STATUSES: RepairStatus[] = [
+    RepairStatus.READY_FOR_PICKUP,
+    RepairStatus.DELIVERED,
+  ];
+
+  /**
+   * Firma de entrega desde el propio portal — el cliente confirma que
+   * recibió el equipo a satisfacción sin que el taller tenga que
+   * imprimir nada. Además de que la orden sea suya y esté en un estado
+   * firmable (ver SIGNABLE_STATUSES): solo una vez — si ya existe una
+   * firma, no se sobrescribe desde aquí (a diferencia del personal, que
+   * sí puede volver a pedirla desde el panel si algo salió mal) — evita
+   * que una firma ya registrada, con valor de evidencia, se reemplace
+   * sin que nadie del taller se entere.
+   */
+  async signMyOrder(customerId: number, orderId: number, file: Express.Multer.File) {
+    const order = await this.prisma.repairOrder.findUnique({ where: { id: orderId } });
+    if (!order || order.customerId !== customerId) {
+      throw new NotFoundException("Orden no encontrada");
+    }
+    if (!this.SIGNABLE_STATUSES.includes(order.status)) {
+      throw new BadRequestException(
+        "Todavía no puedes firmar esta entrega — se habilita cuando el equipo esté listo para recoger",
+      );
+    }
+    if (order.customerSignatureUrl) {
+      throw new BadRequestException(
+        "Esta orden ya tiene una firma registrada. Si necesitas corregirla, comunícate con el taller.",
+      );
+    }
+
+    await this.repairOrders.setSignatureByCustomer(orderId, file);
+    return { message: "Firma registrada" };
   }
 }

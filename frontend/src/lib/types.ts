@@ -589,6 +589,8 @@ export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {
   mouseReceived: boolean;
   device: PortalOrderSummary["device"] & { serialNumber?: string | null };
   photos: { id: number; fileUrl: string; uploadedAt: string; category?: string | null }[];
+  customerSignatureUrl?: string | null;
+  customerSignatureDate?: string | null;
   // Resumen completo (no solo pendientes, a diferencia de PortalOrderSummary)
   // de las cotizaciones nacidas de esta orden.
   quotations: Omit<PortalQuotationSummary, "sourceOrder">[];

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
 import { Button, ErrorBanner } from "@/components/ui";
 
 /**
@@ -8,12 +7,19 @@ import { Button, ErrorBanner } from "@/components/ui";
  * a mano (ver comprobante de entrega). Usa Pointer Events (no mouse/touch
  * por separado) para que funcione igual con mouse, dedo o lápiz óptico
  * con un solo set de handlers.
+ *
+ * No sabe a qué endpoint subir la firma ni con qué cliente HTTP — lo
+ * decide quien lo usa vía `onSave`, porque hay dos rutas de entrada bien
+ * distintas: el personal (RepairOrderDetailPage, api.postForm) y el
+ * propio cliente firmando desde su portal (PortalOrderDetailPage,
+ * portalApi.postForm, otra base de auth). Así este componente no
+ * necesita saber cuál de las dos está corriendo.
  */
 export function SignaturePad({
-  orderId,
+  onSave,
   onSaved,
 }: {
-  orderId: number;
+  onSave: (blob: Blob) => Promise<void>;
   onSaved: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,12 +102,10 @@ export function SignaturePad({
     try {
       const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("No se pudo generar la imagen de la firma");
-      const formData = new FormData();
-      formData.append("file", blob, "firma.png");
-      await api.postForm(`/repair-orders/${orderId}/signature`, formData);
+      await onSave(blob);
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar la firma");
+      setError(err instanceof Error ? err.message : "No se pudo guardar la firma");
     } finally {
       setSaving(false);
     }
