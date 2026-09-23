@@ -15,16 +15,20 @@ export class FinanceService {
   /**
    * Ingresos y egresos diarios de un mes completo, con desglose por fuente.
    *
-   * Cuidado deliberado para no duplicar ingresos: un pago (Payment) que se
-   * registra con una caja abierta genera un CashMovement espejo
-   * (payments.service.ts, "mejor esfuerzo") — sumar Payment.amount Y todos
-   * los CashMovement de tipo INCOME al mismo tiempo contaría ese dinero
-   * dos veces. Por eso los movimientos de caja de ingreso solo se cuentan
-   * aquí cuando NO tienen un pago asociado (paymentId IS NULL) — es decir,
-   * solo los ingresos manuales que alguien registró directo en Caja sin
-   * pasar por un pago. Las ventas (Sale) nunca generan un Payment ni un
-   * CashMovement automáticamente (se registran como ya cobradas en el
-   * momento), así que se cuentan aparte sin riesgo de duplicado.
+   * Cuidado deliberado para no duplicar ingresos: un pago (Payment) o una
+   * venta (Sale) que se registra con una caja abierta genera un
+   * CashMovement espejo (payments.service.ts / sales.service.ts, "mejor
+   * esfuerzo") — sumar Payment.amount/Sale.total Y todos los CashMovement
+   * de tipo INCOME al mismo tiempo contaría ese dinero dos veces. Por eso
+   * los movimientos de caja de ingreso solo se cuentan aquí cuando NO
+   * tienen un pago NI una venta asociada (paymentId IS NULL AND saleId IS
+   * NULL) — es decir, solo los ingresos manuales que alguien registró
+   * directo en Caja sin pasar por un pago o una venta. Mismo criterio para
+   * los egresos: si una venta se cancela, se revierte con un CashMovement
+   * de tipo EXPENSE marcado con ese mismo saleId (ver
+   * CashService.reverseSaleIncomeIfStillOpen) — no es un gasto real, solo
+   * corrige el arqueo de caja, así que también se excluye aquí (la venta
+   * cancelada ya queda fuera del conteo de `sales` por su propio status).
    */
   async getDailyBreakdown(year: number, month: number) {
     if (month < 1 || month > 12) {
@@ -43,10 +47,10 @@ export class FinanceService {
         FROM sales WHERE status = 'ACTIVE' AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'other_income' AS source, 'income' AS kind, amount::text AS amount
-        FROM cash_movements WHERE type = 'INCOME' AND "paymentId" IS NULL AND date >= ${start} AND date < ${end}
+        FROM cash_movements WHERE type = 'INCOME' AND "paymentId" IS NULL AND "saleId" IS NULL AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'cash_expenses' AS source, 'expense' AS kind, amount::text AS amount
-        FROM cash_movements WHERE type = 'EXPENSE' AND date >= ${start} AND date < ${end}
+        FROM cash_movements WHERE type = 'EXPENSE' AND "saleId" IS NULL AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'purchases' AS source, 'expense' AS kind, total::text AS amount
         FROM purchases WHERE status = 'ACTIVE' AND date >= ${start} AND date < ${end}

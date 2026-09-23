@@ -182,15 +182,27 @@ export class CashService {
   }
 
   /**
-   * Integración automática con Pagos (ver PaymentsService): si hay una
-   * caja abierta al momento de registrar un abono, se refleja como ingreso
-   * de caja en la misma transacción — sin bloquear el pago si no hay caja
-   * abierta (se decidió que el registro del pago no debe depender de la
-   * disciplina de caja del día; queda como "mejor esfuerzo").
+   * Integración automática con Pagos y Ventas (ver PaymentsService y
+   * SalesService): si hay una caja abierta al momento de registrar un
+   * abono o una venta, se refleja como ingreso de caja en la misma
+   * transacción — sin bloquear la operación si no hay caja abierta (se
+   * decidió que el registro no debe depender de la disciplina de caja del
+   * día; queda como "mejor esfuerzo"). `paymentId`/`saleId` son
+   * mutuamente excluyentes: cada llamador pasa solo el que le corresponde,
+   * para que FinanceService pueda distinguir de dónde vino el movimiento
+   * y no contarlo dos veces (ya lee payments/sales directo de su propia
+   * tabla).
    */
   async recordIncomeIfRegisterOpen(
     tx: PrismaTxClient,
-    params: { category: string; amount: number; paymentId: number; userId: number; description?: string },
+    params: {
+      category: string;
+      amount: number;
+      paymentId?: number;
+      saleId?: number;
+      userId: number;
+      description?: string;
+    },
   ) {
     const current = await tx.cashRegister.findFirst({ where: { status: "OPEN" } });
     if (!current) {
@@ -204,6 +216,42 @@ export class CashService {
         category: params.category,
         amount: params.amount,
         paymentId: params.paymentId,
+        saleId: params.saleId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
+
+  /**
+   * Reversa el ingreso de una venta cancelada (ver SalesService.cancel) —
+   * un egreso por el mismo monto, marcado con el mismo `saleId` para que
+   * FinanceService lo excluya igual que el ingreso original (no es un
+   * gasto real, es una corrección del arqueo de caja). Busca la caja
+   * donde se registró ESE ingreso específico: si ya se cerró, no se toca
+   * — el arqueo de una caja cerrada es un snapshot congelado, no se
+   * corrige retroactivamente, igual que el resto del sistema no permite
+   * editar historia ya cerrada.
+   */
+  async reverseSaleIncomeIfStillOpen(
+    tx: PrismaTxClient,
+    params: { saleId: number; amount: number; userId: number; description?: string },
+  ) {
+    const originalMovement = await tx.cashMovement.findFirst({
+      where: { saleId: params.saleId, type: CashMovementType.INCOME },
+      include: { cashRegister: true },
+    });
+    if (!originalMovement || originalMovement.cashRegister.status !== "OPEN") {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: originalMovement.cashRegisterId,
+        type: CashMovementType.EXPENSE,
+        category: "Venta cancelada",
+        amount: params.amount,
+        saleId: params.saleId,
         description: params.description,
         userId: params.userId,
       },

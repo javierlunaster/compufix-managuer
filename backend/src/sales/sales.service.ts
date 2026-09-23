@@ -3,6 +3,7 @@ import { InventoryMovementType, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { InventoryMovementsService } from "../inventory/inventory-movements.service";
+import { CashService } from "../cash/cash.service";
 import { CreateSaleDto } from "./dto/create-sale.dto";
 
 @Injectable()
@@ -11,6 +12,7 @@ export class SalesService {
     private prisma: PrismaService,
     private audit: AuditService,
     private movements: InventoryMovementsService,
+    private cash: CashService,
   ) {}
 
   /**
@@ -94,6 +96,20 @@ export class SalesService {
         });
       }
 
+      // Se registra como ya cobrada en el momento (sección 15 del brief —
+      // venta rápida tipo POS, sin saldo pendiente que rastrear), así que
+      // el ingreso de caja se refleja aquí mismo en vez de esperar un
+      // Payment aparte — mismo mecanismo que ya usan los abonos (ver
+      // CashService.recordIncomeIfRegisterOpen), solo que con saleId en
+      // vez de paymentId.
+      await this.cash.recordIncomeIfRegisterOpen(tx, {
+        category: "Ventas",
+        amount: total,
+        saleId: created.id,
+        userId: actingUserId,
+        description: `Venta${dto.customerId ? "" : " de mostrador"} #${created.id}`,
+      });
+
       return created;
     });
 
@@ -173,6 +189,13 @@ export class SalesService {
           notes: "Reversión: venta cancelada",
         });
       }
+
+      await this.cash.reverseSaleIncomeIfStillOpen(tx, {
+        saleId: id,
+        amount: Number(sale.total),
+        userId: actingUserId,
+        description: `Reversión de venta #${id} cancelada`,
+      });
 
       await tx.sale.update({ where: { id }, data: { status: "INACTIVE" } });
     });
