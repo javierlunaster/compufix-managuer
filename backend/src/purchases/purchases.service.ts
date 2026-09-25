@@ -3,6 +3,7 @@ import { InventoryMovementType, PaymentStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { InventoryMovementsService } from "../inventory/inventory-movements.service";
+import { CashService } from "../cash/cash.service";
 import { CreatePurchaseDto } from "./dto/create-purchase.dto";
 import { UpdatePurchasePaymentStatusDto } from "./dto/update-purchase-payment-status.dto";
 
@@ -12,6 +13,7 @@ export class PurchasesService {
     private prisma: PrismaService,
     private audit: AuditService,
     private movements: InventoryMovementsService,
+    private cash: CashService,
   ) {}
 
   /**
@@ -58,6 +60,19 @@ export class PurchasesService {
           notes: dto.notes,
         },
       });
+
+      // Solo genera egreso de caja si la compra queda pagada de una vez —
+      // si queda PENDING/PARTIAL (a crédito con el proveedor), no ha salido
+      // dinero real todavía (ver CashService.recordExpenseIfRegisterOpen).
+      if (created.paymentStatus === "PAID") {
+        await this.cash.recordExpenseIfRegisterOpen(tx, {
+          category: "Compras",
+          amount: total,
+          purchaseId: created.id,
+          userId: actingUserId,
+          description: `Compra a ${supplier.name} #${created.id}`,
+        });
+      }
 
       for (const item of dto.items) {
         await tx.purchaseItem.create({
@@ -140,11 +155,39 @@ export class PurchasesService {
     dto: UpdatePurchasePaymentStatusDto,
     actingUserId: number,
   ) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+    const wasPaid = existing.paymentStatus === "PAID";
+    const willBePaid = dto.paymentStatus === "PAID";
 
-    const purchase = await this.prisma.purchase.update({
-      where: { id },
-      data: { paymentStatus: dto.paymentStatus },
+    const purchase = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.purchase.update({
+        where: { id },
+        data: { paymentStatus: dto.paymentStatus },
+      });
+
+      // Solo dispara el movimiento de caja en la transición: de no-pagada a
+      // pagada genera el egreso (el dinero sale ahora), de pagada a
+      // no-pagada lo reversa (se corrigió el estado, no salió el dinero) —
+      // si ya estaba PAID y sigue PAID, o ya estaba pendiente y sigue
+      // pendiente, no hay nada que hacer.
+      if (!wasPaid && willBePaid) {
+        await this.cash.recordExpenseIfRegisterOpen(tx, {
+          category: "Compras",
+          amount: Number(updated.total),
+          purchaseId: id,
+          userId: actingUserId,
+          description: `Compra #${id} marcada como pagada`,
+        });
+      } else if (wasPaid && !willBePaid) {
+        await this.cash.reversePurchaseExpenseIfStillOpen(tx, {
+          purchaseId: id,
+          amount: Number(updated.total),
+          userId: actingUserId,
+          description: `Compra #${id} corregida a ${dto.paymentStatus}`,
+        });
+      }
+
+      return updated;
     });
 
     await this.audit.log({

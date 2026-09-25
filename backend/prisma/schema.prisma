@@ -345,8 +345,9 @@ model Purchase {
   notes         String?
   status        RecordStatus   @default(ACTIVE)
 
-  items     PurchaseItem[]
-  movements InventoryMovement[]
+  items         PurchaseItem[]
+  movements     InventoryMovement[]
+  cashMovements CashMovement[]
 
   @@map("purchases")
 }
@@ -941,6 +942,13 @@ model CashMovement {
   // directo) y no duplicar el ingreso ni inventar un gasto real.
   saleId         Int?
   sale           Sale?            @relation(fields: [saleId], references: [id])
+  // Compra que generó este movimiento — el egreso automático cuando una
+  // compra queda PAID (al crearla ya pagada, o al marcarla como pagada
+  // después), o el ingreso que lo revierte si se corrige de vuelta a
+  // pendiente (ver PurchasesService). Mismo criterio que saleId: evita
+  // que FinanceService duplique el gasto (ya lee `purchases` directo).
+  purchaseId     Int?
+  purchase       Purchase?        @relation(fields: [purchaseId], references: [id])
   description    String?
   date           DateTime         @default(now())
   userId         Int

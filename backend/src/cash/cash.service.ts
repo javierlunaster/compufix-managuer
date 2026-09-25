@@ -257,4 +257,67 @@ export class CashService {
       },
     });
   }
+
+  /**
+   * Integración automática con Compras (ver PurchasesService): a
+   * diferencia de una venta (que siempre se registra como ya cobrada), una
+   * compra puede quedar PENDING (a crédito con el proveedor) — el dinero
+   * solo sale de caja de verdad cuando queda PAID, ya sea al crearla
+   * directamente pagada o al marcarla como pagada después. Mismo criterio
+   * de "mejor esfuerzo" que el resto: si no hay caja abierta, no bloquea
+   * la compra, simplemente no queda reflejada en caja.
+   */
+  async recordExpenseIfRegisterOpen(
+    tx: PrismaTxClient,
+    params: { category: string; amount: number; purchaseId: number; userId: number; description?: string },
+  ) {
+    const current = await tx.cashRegister.findFirst({ where: { status: "OPEN" } });
+    if (!current) {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: current.id,
+        type: CashMovementType.EXPENSE,
+        category: params.category,
+        amount: params.amount,
+        purchaseId: params.purchaseId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
+
+  /**
+   * Reversa el egreso de una compra que se corrigió de PAID de vuelta a
+   * pendiente/parcial (ver PurchasesService.updatePaymentStatus) — un
+   * ingreso por el mismo monto, mismo criterio que
+   * reverseSaleIncomeIfStillOpen: solo si la caja donde se registró el
+   * egreso original sigue abierta.
+   */
+  async reversePurchaseExpenseIfStillOpen(
+    tx: PrismaTxClient,
+    params: { purchaseId: number; amount: number; userId: number; description?: string },
+  ) {
+    const originalMovement = await tx.cashMovement.findFirst({
+      where: { purchaseId: params.purchaseId, type: CashMovementType.EXPENSE },
+      include: { cashRegister: true },
+    });
+    if (!originalMovement || originalMovement.cashRegister.status !== "OPEN") {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: originalMovement.cashRegisterId,
+        type: CashMovementType.INCOME,
+        category: "Compra revertida a pendiente",
+        amount: params.amount,
+        purchaseId: params.purchaseId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
 }

@@ -23,12 +23,18 @@ export class FinanceService {
    * los movimientos de caja de ingreso solo se cuentan aquí cuando NO
    * tienen un pago NI una venta asociada (paymentId IS NULL AND saleId IS
    * NULL) — es decir, solo los ingresos manuales que alguien registró
-   * directo en Caja sin pasar por un pago o una venta. Mismo criterio para
-   * los egresos: si una venta se cancela, se revierte con un CashMovement
-   * de tipo EXPENSE marcado con ese mismo saleId (ver
-   * CashService.reverseSaleIncomeIfStillOpen) — no es un gasto real, solo
+   * directo en Caja sin pasar por un pago o una venta. Lo mismo aplica a
+   * los egresos con una compra asociada (purchaseId IS NOT NULL): esos ya
+   * se cuentan directo de la tabla `purchases` cuando queda PAID (ver
+   * CashService.recordExpenseIfRegisterOpen en PurchasesService). Mismo
+   * criterio para reversiones: si una venta se cancela o una compra se
+   * corrige de PAID a pendiente, se revierte con un CashMovement marcado
+   * con ese mismo saleId/purchaseId (ver
+   * CashService.reverseSaleIncomeIfStillOpen /
+   * reversePurchaseExpenseIfStillOpen) — no es un ingreso/gasto real, solo
    * corrige el arqueo de caja, así que también se excluye aquí (la venta
-   * cancelada ya queda fuera del conteo de `sales` por su propio status).
+   * cancelada y la compra corregida ya quedan fuera del conteo directo por
+   * su propio status/paymentStatus).
    */
   async getDailyBreakdown(year: number, month: number) {
     if (month < 1 || month > 12) {
@@ -47,10 +53,10 @@ export class FinanceService {
         FROM sales WHERE status = 'ACTIVE' AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'other_income' AS source, 'income' AS kind, amount::text AS amount
-        FROM cash_movements WHERE type = 'INCOME' AND "paymentId" IS NULL AND "saleId" IS NULL AND date >= ${start} AND date < ${end}
+        FROM cash_movements WHERE type = 'INCOME' AND "paymentId" IS NULL AND "saleId" IS NULL AND "purchaseId" IS NULL AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'cash_expenses' AS source, 'expense' AS kind, amount::text AS amount
-        FROM cash_movements WHERE type = 'EXPENSE' AND "saleId" IS NULL AND date >= ${start} AND date < ${end}
+        FROM cash_movements WHERE type = 'EXPENSE' AND "saleId" IS NULL AND "purchaseId" IS NULL AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'purchases' AS source, 'expense' AS kind, total::text AS amount
         FROM purchases WHERE status = 'ACTIVE' AND date >= ${start} AND date < ${end}
