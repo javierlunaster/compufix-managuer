@@ -128,9 +128,24 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------
+  // Datos propios de CompuFix (NO genéricos) — códigos de facturación
+  // reales, proveedores reales y sus números de cuenta bancaria. Nunca se
+  // seedean por defecto: si esto corre en la base de datos de un cliente
+  // nuevo (réplica del sistema, ver DEPLOY_RAILWAY_SUPABASE.md), esos
+  // datos terminarían filtrados ahí — un cliente distinto viendo las
+  // cuentas bancarias de CompuFix. Para reseedear estos datos en el
+  // despliegue real de CompuFix (ej. base de datos nueva), definir
+  // SEED_COMPUFIX_BUSINESS_DATA=true antes de correr `npm run seed`.
+  // ---------------------------------------------------------------------
+  if (process.env.SEED_COMPUFIX_BUSINESS_DATA !== "true") {
+    console.log(
+      "Seed completado (solo catálogos genéricos — SEED_COMPUFIX_BUSINESS_DATA no está en 'true', se omiten servicios/proveedores/cuentas de CompuFix).",
+    );
+    return;
+  }
+
   // Servicios — muestra de "Codigos de facturacion" del Excel
   // (completar el resto en el módulo de Configuración)
-  // ---------------------------------------------------------------------
   const services: { code: string; name: string; basePrice: number }[] = [
     {
       code: "1030",
@@ -185,7 +200,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log("Seed completado.");
+  console.log("Seed completado (incluye datos propios de CompuFix).");
 }
 
 main()

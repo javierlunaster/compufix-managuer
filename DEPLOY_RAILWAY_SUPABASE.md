@@ -215,3 +215,94 @@ para que tome el nuevo valor.
   "$SUPABASE_DB_URL"` en vez de `docker compose exec`.
 - **Fotos**: viven en Supabase Storage, cubiertas por los mismos backups
   del proyecto.
+
+---
+
+## Replicar el sistema para un cliente nuevo
+
+Este mismo repositorio sirve para comercializar el sistema a otros talleres,
+sin tocar una sola línea de código por cliente: cada cliente es un
+**despliegue independiente** (su propio proyecto de Railway, su propia base
+de datos, su propio Storage), pero **todos corren exactamente el mismo
+código**, controlado por variables de entorno — el mismo mecanismo que ya
+usa la marca (`BUSINESS_NAME`, `VITE_LOGO_URL`, etc., ver
+`backend/src/common/config/branding.config.ts` y `frontend/src/lib/branding.ts`).
+
+**La pieza clave para que las actualizaciones se reflejen en todos los
+sistemas**: el proyecto de Railway de cada cliente nuevo se conecta al
+**mismo repo de GitHub y a la misma rama** que ya usa este despliegue —
+nunca se hace un fork ni se copia el código a una carpeta aparte. Railway
+redespliega automáticamente cada servicio cuando llega un push nuevo a esa
+rama, así que un solo `git push` actualiza a CompuFix y a cualquier otro
+cliente al mismo tiempo, sin ningún paso manual adicional. Si algún día se
+necesita que un cliente se quede en una versión anterior mientras el resto
+avanza, ahí sí se le cambiaría a su propia rama — pero mientras todos
+comparten el mismo comportamiento, no hace falta.
+
+### Paso A — Base de datos y Storage del cliente nuevo
+
+1. **Postgres**: en el proyecto de Railway del cliente nuevo (créalo aparte,
+   no lo agregues al proyecto de CompuFix) → **New → Database → Add
+   PostgreSQL**. Railway genera su propio `DATABASE_URL` (variable
+   `DATABASE_URL` del plugin, referenciable como `${{Postgres.DATABASE_URL}}`
+   desde el servicio de backend) — nunca reuses la base de datos de
+   CompuFix ni ninguna de sus variables.
+2. **Storage**: crea un proyecto de Supabase **nuevo** (Paso 1 de esta
+   guía, con su propio bucket `attachments` público) — uno por cliente,
+   nunca el mismo proyecto de Supabase para dos clientes distintos, o las
+   fotos de un cliente terminarían mezcladas en el bucket del otro.
+
+### Paso B — Backend del cliente nuevo
+
+Mismo Paso 2 de esta guía (Root Directory `backend`, mismo repo), pero con
+variables **todas nuevas**, nunca copiadas de CompuFix:
+
+| Variable | Valor |
+|---|---|
+| `DATABASE_URL` | la del Postgres del Paso A.1 |
+| `JWT_SECRET` | nuevo: `openssl rand -base64 48` |
+| `JWT_EXPIRES_IN` | `8h` |
+| `ENCRYPTION_KEY` | nueva: `openssl rand -base64 32` (a diferencia de CompuFix, un cliente nuevo no tiene datos previos que descifrar, así que aquí sí se genera una nueva) |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_STORAGE_BUCKET` | del proyecto de Supabase del Paso A.2 |
+| `NODE_ENV` | `production` |
+| `FRONTEND_URL` | vacío por ahora (Paso 5) |
+| `BUSINESS_NAME` / `BUSINESS_TAGLINE` | nombre y lema del negocio del cliente (ver `backend/.env.example`) |
+| `RESEND_API_KEY` / `MAIL_FROM` | opcional — solo si el cliente quiere notificaciones por correo, con su propio dominio verificado en Resend |
+
+### Paso C — Base de datos en blanco (sin datos de CompuFix)
+
+Con `DATABASE_URL` apuntando a la base del cliente nuevo:
+
+```bash
+cd backend
+npx prisma migrate deploy   # crea las tablas
+npm run seed                 # catálogos genéricos: roles, admin, tipos de
+                              # equipo, marcas, categorías de producto
+```
+
+**No definas `SEED_COMPUFIX_BUSINESS_DATA`.** Sin esa variable (el
+comportamiento por defecto), el seed deja fuera los servicios, proveedores
+y cuentas bancarias reales de CompuFix — esos datos solo se siembran si se
+pone `SEED_COMPUFIX_BUSINESS_DATA=true` explícitamente, y eso nunca debe
+pasar en la base de datos de otro cliente.
+
+Entra con `admin` / `CambiarEstaClave123!` y **cambia la contraseña de
+inmediato** (Cambiar contraseña, en el pie del menú).
+
+### Paso D — Frontend del cliente nuevo
+
+Mismo Paso 4 de esta guía (Root Directory `frontend`), con `VITE_API_URL`
+apuntando al backend del Paso B, más las variables de marca del cliente
+(`VITE_BUSINESS_NAME`, `VITE_LOGO_URL`, `VITE_WHATSAPP_NUMBER`,
+`VITE_SOCIAL_*`, etc. — ver `frontend/.env.example` para la lista
+completa). Cierra el círculo de CORS igual que el Paso 5.
+
+### Qué NO se replica
+
+- **Código**: nunca se copia ni se bifurca — los dos despliegues corren el
+  mismo repo/rama, eso es justo lo que mantiene las correcciones
+  sincronizadas sin esfuerzo.
+- **Secretos**: `JWT_SECRET`, `ENCRYPTION_KEY`, credenciales de Supabase —
+  cada cliente los suyos, nunca compartidos entre despliegues.
+- **Datos**: cada cliente tiene su propia base de datos y su propio bucket
+  de Storage — cero cruce de información entre clientes.
