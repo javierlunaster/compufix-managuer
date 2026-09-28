@@ -238,7 +238,12 @@ export class RepairOrdersService {
    * en fases posteriores cuando esos módulos existan.
    */
   async findAll(
-    params: { search?: string; status?: RepairStatus; technicianId?: number },
+    params: {
+      search?: string;
+      status?: RepairStatus;
+      technicianId?: number;
+      pendingBalance?: boolean;
+    },
     actingUser: AuthenticatedUser,
   ) {
     const where: Prisma.RepairOrderWhereInput = { recordStatus: "ACTIVE" };
@@ -267,7 +272,13 @@ export class RepairOrdersService {
       ];
     }
 
-    return this.prisma.repairOrder.findMany({
+    // El saldo (totalValue - paidAmount) es una comparación entre dos
+    // columnas de la misma fila, que Prisma no puede expresar en su `where`
+    // tipado (solo vía SQL crudo) — como el taller maneja a lo sumo unos
+    // pocos cientos de órdenes activas a la vez, es más simple traerlas
+    // todas con el resto de los filtros ya aplicados y filtrar por saldo en
+    // memoria, aplicando el límite de 100 después.
+    const orders = await this.prisma.repairOrder.findMany({
       where,
       include: {
         customer: { select: { id: true, fullName: true, phone: true } },
@@ -275,8 +286,13 @@ export class RepairOrdersService {
         technician: { select: { id: true, fullName: true } },
       },
       orderBy: { entryDate: "desc" },
-      take: 100,
+      take: params.pendingBalance ? undefined : 100,
     });
+
+    if (!params.pendingBalance) {
+      return orders;
+    }
+    return orders.filter((o) => o.totalValue.minus(o.paidAmount).greaterThan(0)).slice(0, 100);
   }
 
   async findOne(id: number) {

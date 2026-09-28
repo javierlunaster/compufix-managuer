@@ -42,19 +42,21 @@ export class RepairOrdersController {
     return this.repairOrdersService.create(dto, actingUser.id);
   }
 
-  // GET /repair-orders?search=C11061&status=RECEIVED&technicianId=3
+  // GET /repair-orders?search=C11061&status=RECEIVED&technicianId=3&pendingBalance=true
   @Get()
   findAll(
     @CurrentUser() actingUser: AuthenticatedUser,
     @Query("search") search?: string,
     @Query("status") status?: RepairStatus,
     @Query("technicianId") technicianId?: string,
+    @Query("pendingBalance") pendingBalance?: string,
   ) {
     return this.repairOrdersService.findAll(
       {
         search,
         status,
         technicianId: technicianId ? Number(technicianId) : undefined,
+        pendingBalance: pendingBalance === "true",
       },
       actingUser,
     );

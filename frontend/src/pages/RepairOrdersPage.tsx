@@ -11,10 +11,16 @@ export function RepairOrdersPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
   const status = (params.get("status") as RepairStatus | null) ?? "";
+  const pendingBalance = params.get("pendingBalance") === "true";
 
   const { data: orders, loading, error } = useFetch(
-    () => api.get<RepairOrderListItem[]>("/repair-orders", { search, status: status || undefined }),
-    [search, status],
+    () =>
+      api.get<RepairOrderListItem[]>("/repair-orders", {
+        search,
+        status: status || undefined,
+        pendingBalance: pendingBalance || undefined,
+      }),
+    [search, status, pendingBalance],
   );
 
   return (
@@ -55,6 +61,21 @@ export function RepairOrdersPage() {
             </option>
           ))}
         </Select>
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
+          <input
+            type="checkbox"
+            checked={pendingBalance}
+            onChange={(e) =>
+              setParams((p) => {
+                const next = Object.fromEntries(p);
+                if (e.target.checked) next.pendingBalance = "true";
+                else delete next.pendingBalance;
+                return next;
+              })
+            }
+          />
+          Solo con saldo pendiente
+        </label>
       </div>
 
       <Card>
