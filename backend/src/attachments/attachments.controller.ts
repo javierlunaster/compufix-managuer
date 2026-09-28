@@ -70,6 +70,17 @@ export class AttachmentsController {
     return this.attachmentsService.uploadForDiagnostic(orderId, diagnosticId, files, dto, actingUser.id);
   }
 
+  @Post("products/:productId/photos")
+  @UseInterceptors(FilesInterceptor("files", 10, photoUploadOptions))
+  async uploadForProduct(
+    @Param("productId", ParseIntPipe) productId: number,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() dto: UploadAttachmentDto,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.attachmentsService.uploadForProduct(productId, files, dto, actingUser.id);
+  }
+
   @Delete("attachments/:id")
   async remove(
     @Param("id", ParseIntPipe) id: number,

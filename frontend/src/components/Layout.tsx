@@ -25,6 +25,9 @@ const NAV_ITEMS: NavItem[] = [
   // (Fase 2) — mostrar este ítem a otros roles solo llevaría a una
   // pantalla que va a fallar con 403 en cada llamada.
   { to: "/users", label: "Usuarios", icon: UsersIcon, roles: ["Administrador"] },
+  // Mismo criterio: el CRUD de marcas/tipos de equipo (CatalogsController)
+  // está restringido a Administrador/Inventario.
+  { to: "/catalogs", label: "Catálogos", icon: TagIcon, roles: ["Administrador", "Inventario"] },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -296,6 +299,15 @@ function MenuIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
       <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function TagIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M20.6 12.4 12 21l-9-9 8.6-8.6H20.6v8.6z" />
+      <circle cx="15.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
     </svg>
   );
 }

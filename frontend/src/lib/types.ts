@@ -76,8 +76,8 @@ export type Device = {
   repairOrders?: { id: number; orderCode: string; status: RepairStatus; entryDate: string }[];
 };
 
-export type Brand = { id: number; name: string };
-export type DeviceTypeCatalog = { id: number; name: string };
+export type Brand = { id: number; name: string; status?: "ACTIVE" | "INACTIVE" };
+export type DeviceTypeCatalog = { id: number; name: string; status?: "ACTIVE" | "INACTIVE" };
 
 export const REPAIR_STATUSES = [
   "RECEIVED",
@@ -351,6 +351,7 @@ export type Product = {
     lastCost?: string | null;
     supplier: { id: number; name: string };
   }[];
+  photos?: Attachment[];
 };
 
 export type ProductCategory = { id: number; name: string };

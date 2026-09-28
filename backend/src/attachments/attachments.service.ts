@@ -20,6 +20,14 @@ export class AttachmentsService {
     return order;
   }
 
+  private async ensureProductExists(productId: number) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) {
+      throw new NotFoundException("Producto no encontrado");
+    }
+    return product;
+  }
+
   /**
    * Para que el controller valide acceso antes de borrar — un Attachment
    * en la práctica siempre tiene repairOrderId (se crea únicamente desde
@@ -77,7 +85,7 @@ export class AttachmentsService {
 
   private async saveFiles(
     files: Express.Multer.File[],
-    ids: { repairOrderId: number; repairLogId?: number; diagnosticId?: number },
+    ids: { repairOrderId?: number; repairLogId?: number; diagnosticId?: number; productId?: number },
     dto: UploadAttachmentDto,
     actingUserId: number,
   ) {
@@ -85,12 +93,17 @@ export class AttachmentsService {
       throw new BadRequestException("Sube al menos una foto");
     }
 
+    // Misma carpeta por entidad dueña — o la orden, o el producto, nunca
+    // ambas (ids.repairOrderId y ids.productId son mutuamente excluyentes:
+    // cada llamador de saveFiles pasa solo el que le corresponde).
+    const folder = ids.repairOrderId
+      ? `repair-orders/${ids.repairOrderId}`
+      : `products/${ids.productId}`;
+
     // Se sube primero a Supabase Storage (fuera de la transacción de base
     // de datos — no tiene sentido revertir una subida ya hecha) y solo si
     // eso funciona se insertan los registros en la base de datos.
-    const uploaded = await Promise.all(
-      files.map((file) => this.storage.upload(file, `repair-orders/${ids.repairOrderId}`)),
-    );
+    const uploaded = await Promise.all(files.map((file) => this.storage.upload(file, folder)));
 
     const created = await this.prisma.$transaction(
       files.map((file, i) =>
@@ -99,6 +112,7 @@ export class AttachmentsService {
             repairOrderId: ids.repairOrderId,
             repairLogId: ids.repairLogId,
             diagnosticId: ids.diagnosticId,
+            productId: ids.productId,
             fileUrl: uploaded[i].publicUrl,
             // El tipo que realmente queda guardado (siempre JPEG si era una
             // imagen, ver StorageService.compressIfImage), no el que llegó
@@ -117,7 +131,7 @@ export class AttachmentsService {
       userId: actingUserId,
       action: "UPLOAD",
       entityType: "Attachment",
-      entityId: ids.repairOrderId,
+      entityId: (ids.repairOrderId ?? ids.productId)!,
       newValue: { count: created.length, repairLogId: ids.repairLogId },
     });
 
@@ -143,6 +157,21 @@ export class AttachmentsService {
       throw new NotFoundException("Diagnóstico no encontrado en esta orden");
     }
     return this.saveFiles(files, { repairOrderId: orderId, diagnosticId }, dto, actingUserId);
+  }
+
+  /**
+   * Fotos de un producto de inventario (identificación visual del artículo
+   * en el catálogo) — independientes de cualquier reparación, así que
+   * `saveFiles` recibe solo `productId`, sin `repairOrderId`.
+   */
+  async uploadForProduct(
+    productId: number,
+    files: Express.Multer.File[],
+    dto: UploadAttachmentDto,
+    actingUserId: number,
+  ) {
+    await this.ensureProductExists(productId);
+    return this.saveFiles(files, { productId }, dto, actingUserId);
   }
 
   findGeneralPhotosForOrder(orderId: number) {

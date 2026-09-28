@@ -32,6 +32,7 @@ import { SupplierDetailPage } from "@/pages/SupplierDetailPage";
 import { WarrantiesPage } from "@/pages/WarrantiesPage";
 import { WarrantyDetailPage } from "@/pages/WarrantyDetailPage";
 import { UsersPage } from "@/pages/UsersPage";
+import { CatalogsPage } from "@/pages/CatalogsPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
@@ -143,6 +144,7 @@ function AppRoutes() {
       <Route path="/warranties/:id" element={<ProtectedLayout><WarrantyDetailPage /></ProtectedLayout>} />
       <Route path="/users" element={<ProtectedLayout><UsersPage /></ProtectedLayout>} />
       <Route path="/users/:id" element={<ProtectedLayout><UserDetailPage /></ProtectedLayout>} />
+      <Route path="/catalogs" element={<ProtectedLayout><CatalogsPage /></ProtectedLayout>} />
       <Route path="/account" element={<ProtectedLayout><AccountPage /></ProtectedLayout>} />
       <Route path="/devices/:id" element={<ProtectedLayout><DeviceDetailPage /></ProtectedLayout>} />
 

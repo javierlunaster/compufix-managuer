@@ -105,6 +105,7 @@ export class ProductsService {
         category: true,
         brand: true,
         supplierRefs: { include: { supplier: true } },
+        photos: { orderBy: { uploadedAt: "desc" } },
       },
     });
     if (!product) {

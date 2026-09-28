@@ -241,6 +241,7 @@ model Product {
   repairParts      RepairPart[]
   quotationItems   QuotationItem[]
   softwareLicenses SoftwareLicense[]
+  photos           Attachment[]
 
   @@map("products")
 }
@@ -1017,6 +1018,12 @@ model Attachment {
   // contando como "de esta orden" en cualquier consulta general.
   diagnosticId  Int?
   diagnostic    RepairDiagnostic? @relation("DiagnosticAttachments", fields: [diagnosticId], references: [id])
+  // Fotos de un producto de inventario — a diferencia de las anteriores
+  // (todas ligadas a una orden de reparación de una forma u otra), estas
+  // son independientes de cualquier reparación: fotos del repuesto/artículo
+  // en sí, para identificarlo visualmente en el catálogo.
+  productId     Int?
+  product       Product?          @relation(fields: [productId], references: [id])
   fileUrl       String
   fileType      String // image/jpeg, application/pdf...
   category      String? // equipo_recibido, daño_fisico, placa, serial, diagnostico, resultado_final...

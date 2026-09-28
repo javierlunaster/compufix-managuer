@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { Brand, InventoryMovement, Product, ProductCategory } from "@/lib/types";
+import { PhotoGallery } from "@/components/PhotoGallery";
 import {
   Button,
   Card,
@@ -138,6 +139,17 @@ export function ProductDetailPage() {
           </div>
         </Card>
       )}
+
+      <Card>
+        <CardHeader title="Fotos" subtitle="Para identificar el producto en el catálogo" />
+        <div className="p-4">
+          <PhotoGallery
+            photos={product.photos ?? []}
+            uploadUrl={`/products/${product.id}/photos`}
+            onChanged={reloadProduct}
+          />
+        </div>
+      </Card>
 
       <AdjustStockForm productId={product.id} onAdjusted={reloadAll} />
 
