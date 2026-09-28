@@ -109,7 +109,10 @@ export class CashService {
       include: {
         movements: {
           orderBy: { date: "desc" },
-          include: { user: { select: { id: true, fullName: true } } },
+          include: {
+            user: { select: { id: true, fullName: true } },
+            repairOrder: { select: { id: true, orderCode: true } },
+          },
         },
         openedBy: { select: { id: true, fullName: true } },
       },
@@ -133,7 +136,10 @@ export class CashService {
       include: {
         movements: {
           orderBy: { date: "desc" },
-          include: { user: { select: { id: true, fullName: true } } },
+          include: {
+            user: { select: { id: true, fullName: true } },
+            repairOrder: { select: { id: true, orderCode: true } },
+          },
         },
         openedBy: { select: { id: true, fullName: true } },
         closedBy: { select: { id: true, fullName: true } },
@@ -159,6 +165,15 @@ export class CashService {
       );
     }
 
+    if (dto.repairOrderId) {
+      const order = await this.prisma.repairOrder.findUnique({
+        where: { id: dto.repairOrderId },
+      });
+      if (!order) {
+        throw new NotFoundException("La orden de reparación indicada no existe");
+      }
+    }
+
     const movement = await this.prisma.cashMovement.create({
       data: {
         cashRegisterId: current.id,
@@ -166,8 +181,10 @@ export class CashService {
         category: dto.category,
         amount: dto.amount,
         description: dto.description,
+        repairOrderId: dto.repairOrderId,
         userId: actingUserId,
       },
+      include: { repairOrder: { select: { id: true, orderCode: true } } },
     });
 
     await this.audit.log({

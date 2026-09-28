@@ -67,6 +67,7 @@ export function CashRegisterDetailPage() {
                 <th className="px-4 py-2">Hora</th>
                 <th className="px-4 py-2">Categoría</th>
                 <th className="px-4 py-2">Monto</th>
+                <th className="px-4 py-2">Reparación</th>
                 <th className="px-4 py-2">Usuario</th>
               </tr>
             </thead>
@@ -78,6 +79,18 @@ export function CashRegisterDetailPage() {
                   <td className={`px-4 py-2 tabular ${m.type === "INCOME" ? "text-success" : "text-danger"}`}>
                     {m.type === "INCOME" ? "+" : "-"}
                     {formatCurrency(m.amount)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {m.repairOrder ? (
+                      <Link
+                        to={`/repair-orders/${m.repairOrder.id}`}
+                        className="font-mono text-xs text-accent"
+                      >
+                        {m.repairOrder.orderCode}
+                      </Link>
+                    ) : (
+                      <span className="text-ink-muted">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-ink-muted">{m.user.fullName}</td>
                 </tr>

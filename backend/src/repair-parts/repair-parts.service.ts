@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { InventoryMovementType, Product } from "@prisma/client";
+import { CashMovementType, InventoryMovementType, Product } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { InventoryMovementsService } from "../inventory/inventory-movements.service";
@@ -153,14 +153,23 @@ export class RepairPartsService {
    * repuestos + mano de obra = costo total; precio cobrado; ganancia;
    * margen). En esta fase, "mano de obra" como costo del taller todavía no
    * se registra por separado (no hay tarifas horarias en el modelo), así
-   * que la ganancia se calcula sobre el costo de repuestos solamente —
-   * queda como una simplificación explícita del MVP, documentada aquí y en
-   * el README, hasta que un módulo de servicios/facturación permita
+   * que la ganancia todavía no incluye la mano de obra propia — sigue
+   * siendo una simplificación explícita del MVP, documentada aquí y en el
+   * README, hasta que un módulo de servicios/facturación permita
    * desglosar mano de obra como un costo propio.
+   *
+   * Sí incluye, además del costo de repuestos, los egresos de Caja que se
+   * asignaron manualmente a esta orden (ver CashService.createMovement,
+   * campo repairOrderId) — el caso típico es un servicio externo
+   * subcontratado (una reparación mandada a hacer afuera) pagado de caja,
+   * que es un costo real de la orden aunque no pase por RepairPart.
    */
   async costSummary(orderId: number) {
     const order = await this.ensureOrderExists(orderId);
     const parts = await this.findAllForOrder(orderId);
+    const externalExpenseMovements = await this.prisma.cashMovement.findMany({
+      where: { repairOrderId: orderId, type: CashMovementType.EXPENSE },
+    });
 
     const partsCost = parts.reduce(
       (sum, p) => sum + Number(p.unitCost) * p.quantity,
@@ -170,13 +179,25 @@ export class RepairPartsService {
       (sum, p) => sum + Number(p.unitPrice) * p.quantity,
       0,
     );
+    const externalExpenses = externalExpenseMovements.reduce(
+      (sum, m) => sum + Number(m.amount),
+      0,
+    );
     const totalCharged = Number(order.totalValue);
-    const profit = totalCharged - partsCost;
+    const profit = totalCharged - partsCost - externalExpenses;
     const marginPct = totalCharged > 0 ? (profit / totalCharged) * 100 : 0;
 
     return {
       partsCost,
       partsRevenue,
+      externalExpenses,
+      externalExpenseMovements: externalExpenseMovements.map((m) => ({
+        id: m.id,
+        category: m.category,
+        amount: Number(m.amount),
+        description: m.description,
+        date: m.date,
+      })),
       totalCharged,
       profit,
       marginPct: Math.round(marginPct * 100) / 100,

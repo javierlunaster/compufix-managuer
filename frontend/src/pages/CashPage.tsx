@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { CashRegister } from "@/lib/types";
+import type { CashRegister, Paginated, RepairOrderListItem } from "@/lib/types";
 import {
   Button,
   Card,
@@ -194,6 +194,7 @@ function OpenRegisterView({ register, onChanged }: { register: CashRegister; onC
                 <th className="px-4 py-2">Hora</th>
                 <th className="px-4 py-2">Categoría</th>
                 <th className="px-4 py-2">Monto</th>
+                <th className="px-4 py-2">Reparación</th>
                 <th className="px-4 py-2">Usuario</th>
               </tr>
             </thead>
@@ -205,6 +206,18 @@ function OpenRegisterView({ register, onChanged }: { register: CashRegister; onC
                   <td className={`px-4 py-2 tabular ${m.type === "INCOME" ? "text-success" : "text-danger"}`}>
                     {m.type === "INCOME" ? "+" : "-"}
                     {formatCurrency(m.amount)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {m.repairOrder ? (
+                      <Link
+                        to={`/repair-orders/${m.repairOrder.id}`}
+                        className="font-mono text-xs text-accent"
+                      >
+                        {m.repairOrder.orderCode}
+                      </Link>
+                    ) : (
+                      <span className="text-ink-muted">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-ink-muted">{m.user.fullName}</td>
                 </tr>
@@ -237,8 +250,24 @@ function AddMovementForm({ onAdded }: { onAdded: () => void }) {
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [repairOrder, setRepairOrder] = useState<RepairOrderListItem | null>(null);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderResults, setOrderResults] = useState<RepairOrderListItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function searchOrders(term: string) {
+    setOrderSearch(term);
+    if (term.trim().length < 2) {
+      setOrderResults([]);
+      return;
+    }
+    const result = await api.get<Paginated<RepairOrderListItem>>("/repair-orders", {
+      search: term,
+      pageSize: 10,
+    });
+    setOrderResults(result.data);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -250,10 +279,13 @@ function AddMovementForm({ onAdded }: { onAdded: () => void }) {
         category,
         amount: Number(amount),
         description: description || undefined,
+        repairOrderId: repairOrder?.id,
       });
       setCategory("");
       setAmount("");
       setDescription("");
+      setRepairOrder(null);
+      setOrderSearch("");
       onAdded();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo registrar el movimiento");
@@ -269,7 +301,17 @@ function AddMovementForm({ onAdded }: { onAdded: () => void }) {
         {error && <ErrorBanner message={error} />}
         <div className="grid grid-cols-4 gap-3">
           <Field label="Tipo">
-            <Select value={type} onChange={(e) => setType(e.target.value)}>
+            <Select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                if (e.target.value !== "EXPENSE") {
+                  setRepairOrder(null);
+                  setOrderSearch("");
+                  setOrderResults([]);
+                }
+              }}
+            >
               <option value="EXPENSE">Egreso</option>
               <option value="INCOME">Ingreso</option>
             </Select>
@@ -289,6 +331,53 @@ function AddMovementForm({ onAdded }: { onAdded: () => void }) {
             <Input value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
         </div>
+
+        {type === "EXPENSE" && (
+          <Field label="Reparación relacionada (opcional — ej. servicio externo subcontratado)">
+            {repairOrder ? (
+              <div className="flex items-center justify-between rounded border border-accent/30 bg-accent/5 px-3 py-2 text-sm">
+                <span className="text-ink">
+                  {repairOrder.orderCode} — {repairOrder.customer.fullName}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs text-ink-muted hover:text-accent"
+                  onClick={() => setRepairOrder(null)}
+                >
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  value={orderSearch}
+                  onChange={(e) => searchOrders(e.target.value)}
+                  placeholder="Código de orden o nombre del cliente…"
+                />
+                {orderResults.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full rounded border border-border bg-surface-raised shadow-lg">
+                    {orderResults.map((o) => (
+                      <li key={o.id}>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-bg"
+                          onClick={() => {
+                            setRepairOrder(o);
+                            setOrderResults([]);
+                          }}
+                        >
+                          <span className="font-mono text-accent">{o.orderCode}</span>{" "}
+                          <span className="text-ink-muted">{o.customer.fullName}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </Field>
+        )}
+
         <Button type="submit" variant="primary" disabled={saving}>
           {saving ? "Registrando…" : "Registrar"}
         </Button>

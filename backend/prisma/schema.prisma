@@ -575,6 +575,7 @@ model RepairOrder {
   warranties          Warranty[]            @relation("OriginRepairOrder")
   inventoryMovements  InventoryMovement[]
   hardwareTestResults HardwareTestResult[]
+  cashMovements       CashMovement[]
 
   @@map("repair_orders")
 }
@@ -949,6 +950,17 @@ model CashMovement {
   // que FinanceService duplique el gasto (ya lee `purchases` directo).
   purchaseId     Int?
   purchase       Purchase?        @relation(fields: [purchaseId], references: [id])
+  // Reparación a la que se asigna manualmente este movimiento (sección
+  // Caja) — a diferencia de paymentId/saleId/purchaseId, que marcan un
+  // movimiento AUTOGENERADO como espejo de otra tabla (y por eso
+  // FinanceService los excluye para no duplicar), este campo es solo
+  // metadata sobre un movimiento manual real: un egreso que sí debe
+  // seguir contando en Finanzas, pero que además queda vinculado a la
+  // orden para poder descontarlo de su ganancia (ej. un servicio externo
+  // subcontratado, pagado de caja). Opcional: la mayoría de movimientos no
+  // aplican a ninguna reparación puntual.
+  repairOrderId  Int?
+  repairOrder    RepairOrder?     @relation(fields: [repairOrderId], references: [id])
   description    String?
   date           DateTime         @default(now())
   userId         Int

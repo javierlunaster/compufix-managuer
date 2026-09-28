@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
 import { CashMovementType } from "@prisma/client";
 
 export class CreateCashMovementDto {
@@ -20,4 +20,11 @@ export class CreateCashMovementDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  // Ej. un servicio externo subcontratado (una reparación mandada a hacer
+  // afuera) pagado de caja — no siempre aplica, la mayoría de movimientos
+  // no están atados a ninguna orden puntual.
+  @IsOptional()
+  @IsInt()
+  repairOrderId?: number;
 }

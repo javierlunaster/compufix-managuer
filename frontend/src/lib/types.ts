@@ -316,6 +316,14 @@ export type HardwareTestResult = {
 export type PartsCostSummary = {
   partsCost: number;
   partsRevenue: number;
+  externalExpenses: number;
+  externalExpenseMovements: {
+    id: number;
+    category: string;
+    amount: number;
+    description?: string | null;
+    date: string;
+  }[];
   totalCharged: number;
   profit: number;
   marginPct: number;
@@ -515,6 +523,7 @@ export type CashMovementEntry = {
   description?: string | null;
   date: string;
   user: { id: number; fullName: string };
+  repairOrder?: { id: number; orderCode: string } | null;
 };
 
 export type CashRegister = {

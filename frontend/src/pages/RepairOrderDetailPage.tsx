@@ -1535,12 +1535,12 @@ function PartRow({
 }
 
 /**
- * Costo de repuestos, ingreso por repuestos y ganancia de la orden (Fase
- * 6). Importante: esta ganancia solo considera repuestos, NO mano de obra
- * — el modelo de datos todavía no tiene una tarifa de servicio desglosada
- * por orden, así que mostrarlo como "la ganancia total de la reparación"
- * sería engañoso. Se etiqueta explícitamente como "de repuestos" para que
- * no se confunda con la ganancia real del trabajo completo.
+ * Costo de repuestos + egresos externos asignados desde Caja (ej. un
+ * servicio subcontratado), ingreso por repuestos y ganancia de la orden
+ * (Fase 6). Importante: esta ganancia todavía NO incluye mano de obra
+ * propia — el modelo de datos todavía no tiene una tarifa de servicio
+ * desglosada por orden, así que mostrarlo como "la ganancia total de la
+ * reparación" sería engañoso.
  */
 function CostSummaryCard({ orderId, refreshKey }: { orderId: number; refreshKey: number }) {
   const { data: summary, loading, error } = useFetch(
@@ -1553,17 +1553,17 @@ function CostSummaryCard({ orderId, refreshKey }: { orderId: number; refreshKey:
   return (
     <Card>
       <CardHeader
-        title="Costo y ganancia de repuestos"
-        subtitle="Solo repuestos — no incluye mano de obra, que todavía no se desglosa por orden"
+        title="Costo y ganancia de la orden"
+        subtitle="Repuestos + egresos externos asignados desde Caja — no incluye mano de obra propia, que todavía no se desglosa por orden"
       />
       <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Costo</p>
+          <p className="text-xs uppercase tracking-wide text-ink-muted">Costo de repuestos</p>
           <p className="font-mono tabular text-ink">{formatCurrency(summary.partsCost)}</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Cobrado por repuestos</p>
-          <p className="font-mono tabular text-ink">{formatCurrency(summary.partsRevenue)}</p>
+          <p className="text-xs uppercase tracking-wide text-ink-muted">Egresos externos</p>
+          <p className="font-mono tabular text-ink">{formatCurrency(summary.externalExpenses)}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-muted">Ganancia de la orden</p>
@@ -1578,6 +1578,24 @@ function CostSummaryCard({ orderId, refreshKey }: { orderId: number; refreshKey:
           </p>
         </div>
       </div>
+      {summary.externalExpenseMovements.length > 0 && (
+        <div className="border-t border-border px-4 py-3">
+          <p className="mb-2 text-xs uppercase tracking-wide text-ink-muted">
+            Egresos asignados desde Caja
+          </p>
+          <ul className="space-y-1 text-sm">
+            {summary.externalExpenseMovements.map((m) => (
+              <li key={m.id} className="flex items-center justify-between">
+                <span className="text-ink-muted">
+                  {m.category}
+                  {m.description ? ` — ${m.description}` : ""} · {formatDate(m.date)}
+                </span>
+                <span className="font-mono tabular text-danger">-{formatCurrency(m.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Card>
   );
 }
