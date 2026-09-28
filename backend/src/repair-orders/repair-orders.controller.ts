@@ -42,7 +42,7 @@ export class RepairOrdersController {
     return this.repairOrdersService.create(dto, actingUser.id);
   }
 
-  // GET /repair-orders?search=C11061&status=RECEIVED&technicianId=3&pendingBalance=true
+  // GET /repair-orders?search=C11061&status=RECEIVED&technicianId=3&pendingBalance=true&page=1&pageSize=20
   @Get()
   findAll(
     @CurrentUser() actingUser: AuthenticatedUser,
@@ -50,6 +50,8 @@ export class RepairOrdersController {
     @Query("status") status?: RepairStatus,
     @Query("technicianId") technicianId?: string,
     @Query("pendingBalance") pendingBalance?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.repairOrdersService.findAll(
       {
@@ -57,6 +59,8 @@ export class RepairOrdersController {
         status,
         technicianId: technicianId ? Number(technicianId) : undefined,
         pendingBalance: pendingBalance === "true",
+        page: page ? Number(page) : undefined,
+        pageSize: pageSize ? Number(pageSize) : undefined,
       },
       actingUser,
     );

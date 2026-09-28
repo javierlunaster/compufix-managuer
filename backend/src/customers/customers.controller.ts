@@ -24,10 +24,18 @@ export class CustomersController {
     return this.customersService.create(dto, actingUser.id);
   }
 
-  // GET /customers?search=juan  → búsqueda rápida por nombre/teléfono/documento
+  // GET /customers?search=juan&page=1&pageSize=20 → búsqueda rápida por nombre/teléfono/documento
   @Get()
-  search(@Query("search") search?: string) {
-    return this.customersService.search(search);
+  search(
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.customersService.search(
+      search,
+      page ? Number(page) : undefined,
+      pageSize ? Number(pageSize) : undefined,
+    );
   }
 
   @Get(":id")

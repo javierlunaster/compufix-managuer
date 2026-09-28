@@ -4,6 +4,17 @@
 
 export type Role = { id: number; name: string };
 
+// Respuesta paginada estándar (ver RepairOrdersService/CustomersService en
+// el backend) — `data` trae solo la página actual, `total` es el conteo
+// completo de la búsqueda (con los mismos filtros), para poder calcular
+// cuántas páginas hay.
+export type Paginated<T> = {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 /**
  * Usuario del sistema tal como lo devuelve la gestión de usuarios
  * (Administrador) — distinto de `AuthUser`, que es la sesión actual.

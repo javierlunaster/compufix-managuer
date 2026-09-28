@@ -243,6 +243,8 @@ export class RepairOrdersService {
       status?: RepairStatus;
       technicianId?: number;
       pendingBalance?: boolean;
+      page?: number;
+      pageSize?: number;
     },
     actingUser: AuthenticatedUser,
   ) {
@@ -272,27 +274,46 @@ export class RepairOrdersService {
       ];
     }
 
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : 20;
+    const include = {
+      customer: { select: { id: true, fullName: true, phone: true } },
+      device: { select: { id: true, model: true, serialNumber: true } },
+      technician: { select: { id: true, fullName: true } },
+    } satisfies Prisma.RepairOrderInclude;
+
+    if (!params.pendingBalance) {
+      const [data, total] = await Promise.all([
+        this.prisma.repairOrder.findMany({
+          where,
+          include,
+          orderBy: { entryDate: "desc" },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        this.prisma.repairOrder.count({ where }),
+      ]);
+      return { data, total, page, pageSize };
+    }
+
     // El saldo (totalValue - paidAmount) es una comparación entre dos
     // columnas de la misma fila, que Prisma no puede expresar en su `where`
     // tipado (solo vía SQL crudo) — como el taller maneja a lo sumo unos
-    // pocos cientos de órdenes activas a la vez, es más simple traerlas
-    // todas con el resto de los filtros ya aplicados y filtrar por saldo en
-    // memoria, aplicando el límite de 100 después.
-    const orders = await this.prisma.repairOrder.findMany({
+    // pocos cientos de órdenes activas a la vez, es más simple traer todas
+    // las que matchean el resto de los filtros y filtrar/paginar por saldo
+    // en memoria.
+    const allMatching = await this.prisma.repairOrder.findMany({
       where,
-      include: {
-        customer: { select: { id: true, fullName: true, phone: true } },
-        device: { select: { id: true, model: true, serialNumber: true } },
-        technician: { select: { id: true, fullName: true } },
-      },
+      include,
       orderBy: { entryDate: "desc" },
-      take: params.pendingBalance ? undefined : 100,
     });
-
-    if (!params.pendingBalance) {
-      return orders;
-    }
-    return orders.filter((o) => o.totalValue.minus(o.paidAmount).greaterThan(0)).slice(0, 100);
+    const withPendingBalance = allMatching.filter((o) =>
+      o.totalValue.minus(o.paidAmount).greaterThan(0),
+    );
+    const total = withPendingBalance.length;
+    const start = (page - 1) * pageSize;
+    const data = withPendingBalance.slice(start, start + pageSize);
+    return { data, total, page, pageSize };
   }
 
   async findOne(id: number) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
-import type { Customer, QuotationDetail, QuotationItemType, Service } from "@/lib/types";
+import type { Customer, Paginated, QuotationDetail, QuotationItemType, Service } from "@/lib/types";
 import { ProductSearch } from "@/components/ProductSearch";
 import { ServiceSearch } from "@/components/ServiceSearch";
 import {
@@ -55,7 +55,8 @@ export function NewQuotationPage() {
       setCustomerResults([]);
       return;
     }
-    setCustomerResults(await api.get<Customer[]>("/customers", { search: term }));
+    const result = await api.get<Paginated<Customer>>("/customers", { search: term });
+    setCustomerResults(result.data);
   }
 
   function addPartItem(product: Product) {

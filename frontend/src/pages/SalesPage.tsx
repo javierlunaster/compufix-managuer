@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Customer, PaymentMethod, Product, Sale } from "@/lib/types";
+import type { Customer, Paginated, PaymentMethod, Product, Sale } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { ProductSearch } from "@/components/ProductSearch";
 import {
@@ -42,7 +42,8 @@ export function SalesPage() {
       setCustomerResults([]);
       return;
     }
-    setCustomerResults(await api.get<Customer[]>("/customers", { search: term }));
+    const result = await api.get<Paginated<Customer>>("/customers", { search: term });
+    setCustomerResults(result.data);
   }
 
   function addItem(product: Product) {

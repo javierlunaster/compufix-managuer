@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Customer } from "@/lib/types";
+import type { Customer, Paginated } from "@/lib/types";
 import {
   Button,
   Card,
@@ -11,17 +11,22 @@ import {
   ErrorBanner,
   Field,
   Input,
+  Pagination,
   Spinner,
 } from "@/components/ui";
 
+const PAGE_SIZE = 20;
+
 export function CustomersPage() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
 
-  const { data: customers, loading, error, reload } = useFetch(
-    () => api.get<Customer[]>("/customers", { search }),
-    [search],
+  const { data: result, loading, error, reload } = useFetch(
+    () => api.get<Paginated<Customer>>("/customers", { search, page, pageSize: PAGE_SIZE }),
+    [search, page],
   );
+  const customers = result?.data;
 
   return (
     <div className="max-w-4xl">
@@ -48,7 +53,10 @@ export function CustomersPage() {
 
       <Input
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(1);
+        }}
         placeholder="Buscar cliente…"
         className="mb-4"
       />
@@ -86,6 +94,14 @@ export function CustomersPage() {
               </li>
             ))}
           </ul>
+        )}
+        {!loading && result && (
+          <Pagination
+            page={result.page}
+            pageSize={result.pageSize}
+            total={result.total}
+            onPageChange={setPage}
+          />
         )}
       </Card>
     </div>

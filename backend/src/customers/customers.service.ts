@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { normalizeName } from "../common/utils/normalize-name.util";
@@ -68,31 +69,36 @@ export class CustomersService {
    * Búsqueda rápida por nombre, teléfono o documento (sección 5 del brief).
    * El nombre se compara contra normalizedName para que sea insensible a
    * mayúsculas y tildes, igual que la lógica de detección de duplicados.
+   *
+   * Paginado (`page`/`pageSize`) para la página de Clientes, que ya no trae
+   * todo de una — pero el pageSize por defecto se queda en 50 (no en el
+   * tamaño de página de esa pantalla) porque este mismo endpoint también lo
+   * usan los autocompletados de cliente en Ventas/Cotizaciones/Nueva orden,
+   * que esperan una lista corta de sugerencias, no una página navegable.
    */
-  async search(term?: string) {
-    if (!term || term.trim().length === 0) {
-      return this.prisma.customer.findMany({
-        where: { status: "ACTIVE" },
-        orderBy: { fullName: "asc" },
-        take: 50,
-      });
+  async search(term?: string, page = 1, pageSize = 50) {
+    const where: Prisma.CustomerWhereInput = { status: "ACTIVE" };
+    if (term && term.trim().length > 0) {
+      const normalizedTerm = normalizeName(term);
+      where.OR = [
+        { normalizedName: { contains: normalizedTerm } },
+        { phone: { contains: term } },
+        { whatsapp: { contains: term } },
+        { documentId: { contains: term } },
+      ];
     }
 
-    const normalizedTerm = normalizeName(term);
+    const [data, total] = await Promise.all([
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { fullName: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.customer.count({ where }),
+    ]);
 
-    return this.prisma.customer.findMany({
-      where: {
-        status: "ACTIVE",
-        OR: [
-          { normalizedName: { contains: normalizedTerm } },
-          { phone: { contains: term } },
-          { whatsapp: { contains: term } },
-          { documentId: { contains: term } },
-        ],
-      },
-      orderBy: { fullName: "asc" },
-      take: 50,
-    });
+    return { data, total, page, pageSize };
   }
 
   async findOne(id: number) {

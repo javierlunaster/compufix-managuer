@@ -1,27 +1,54 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { RepairOrderListItem, RepairStatus } from "@/lib/types";
+import type { Paginated, RepairOrderListItem, RepairStatus } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
-import { Button, Card, EmptyState, ErrorBanner, Input, Select, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Pagination,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/format";
+
+const PAGE_SIZE = 20;
 
 export function RepairOrdersPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
   const status = (params.get("status") as RepairStatus | null) ?? "";
   const pendingBalance = params.get("pendingBalance") === "true";
+  const page = Number(params.get("page") ?? "1") || 1;
 
-  const { data: orders, loading, error } = useFetch(
+  const { data: result, loading, error } = useFetch(
     () =>
-      api.get<RepairOrderListItem[]>("/repair-orders", {
+      api.get<Paginated<RepairOrderListItem>>("/repair-orders", {
         search,
         status: status || undefined,
         pendingBalance: pendingBalance || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       }),
-    [search, status, pendingBalance],
+    [search, status, pendingBalance, page],
   );
+  const orders = result?.data;
+
+  // Cualquier cambio de filtro vuelve a la página 1 — si no, se puede
+  // quedar en una página que ya no existe para el nuevo filtro (ej. estar
+  // en la página 5 y luego buscar algo que solo tiene 2 páginas).
+  function updateFilter(update: (next: Record<string, string>) => void) {
+    setParams((p) => {
+      const next = Object.fromEntries(p);
+      update(next);
+      delete next.page;
+      return next;
+    });
+  }
 
   return (
     <div className="max-w-5xl">
@@ -38,18 +65,20 @@ export function RepairOrdersPage() {
       <div className="mb-4 flex gap-3">
         <Input
           value={search}
-          onChange={(e) => setParams((p) => ({ ...Object.fromEntries(p), search: e.target.value }))}
+          onChange={(e) =>
+            updateFilter((next) => {
+              next.search = e.target.value;
+            })
+          }
           placeholder="C11061, nombre del cliente, serial…"
           className="max-w-sm"
         />
         <Select
           value={status}
           onChange={(e) =>
-            setParams((p) => {
-              const next = Object.fromEntries(p);
+            updateFilter((next) => {
               if (e.target.value) next.status = e.target.value;
               else delete next.status;
-              return next;
             })
           }
           className="max-w-xs"
@@ -66,11 +95,9 @@ export function RepairOrdersPage() {
             type="checkbox"
             checked={pendingBalance}
             onChange={(e) =>
-              setParams((p) => {
-                const next = Object.fromEntries(p);
+              updateFilter((next) => {
                 if (e.target.checked) next.pendingBalance = "true";
                 else delete next.pendingBalance;
-                return next;
               })
             }
           />
@@ -126,6 +153,16 @@ export function RepairOrdersPage() {
               ))}
             </tbody>
           </table>
+        )}
+        {!loading && result && (
+          <Pagination
+            page={result.page}
+            pageSize={result.pageSize}
+            total={result.total}
+            onPageChange={(p) =>
+              setParams((prev) => ({ ...Object.fromEntries(prev), page: String(p) }))
+            }
+          />
         )}
       </Card>
     </div>

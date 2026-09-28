@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Brand, Customer, Device, DeviceTypeCatalog, RepairOrderDetail } from "@/lib/types";
+import type { Brand, Customer, Device, DeviceTypeCatalog, Paginated, RepairOrderDetail } from "@/lib/types";
 import {
   Button,
   Card,
@@ -77,8 +77,8 @@ export function NewRepairOrderPage() {
       setCustomerResults([]);
       return;
     }
-    const results = await api.get<Customer[]>("/customers", { search: term });
-    setCustomerResults(results);
+    const results = await api.get<Paginated<Customer>>("/customers", { search: term });
+    setCustomerResults(results.data);
   }
 
   const [saving, setSaving] = useState(false);
