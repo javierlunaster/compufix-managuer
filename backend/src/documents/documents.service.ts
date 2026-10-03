@@ -286,6 +286,40 @@ export class DocumentsService {
       ["Saldo", formatCurrency(order.balance)],
     ]);
 
+    // Trabajo realizado: antes el comprobante de entrega no decía QUÉ se
+    // hizo, solo cuánto costó — el cliente firmaba sin tener por escrito en
+    // qué consistió la reparación. Se usa el resultado de cada diagnóstico
+    // (el resumen en lenguaje llano que ya escribe el técnico, ej. "Se
+    // reemplazó el IC de carga...") en vez de los datos técnicos internos
+    // (placa, mediciones) que sí van en el Informe técnico — ese es un
+    // documento aparte para uso del taller, este es para el cliente.
+    const diagnosisNotes = order.diagnostics.map((d) => d.result).filter((r): r is string => !!r);
+    const hasWorkDetail =
+      diagnosisNotes.length > 0 || order.partsUsed.length > 0 || order.servicesUsed.length > 0;
+
+    pdf.sectionTitle("Trabajo realizado");
+    if (!hasWorkDetail) {
+      pdf.paragraph("Sin detalle de trabajo registrado.");
+    } else {
+      for (const note of diagnosisNotes) {
+        pdf.paragraph(note);
+      }
+      if (order.partsUsed.length > 0) {
+        pdf.table(
+          ["Repuesto utilizado", "Cantidad"],
+          order.partsUsed.map((p) => [p.product.description, String(p.quantity)]),
+          [340, 100],
+        );
+      }
+      if (order.servicesUsed.length > 0) {
+        pdf.table(
+          ["Servicio realizado", "Valor"],
+          order.servicesUsed.map((s) => [s.service.name, formatCurrency(s.price)]),
+          [340, 100],
+        );
+      }
+    }
+
     pdf.sectionTitle("Garantía");
     if (order.warranties.length > 0) {
       const w = order.warranties[0];
