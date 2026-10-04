@@ -1473,7 +1473,7 @@ function PartsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: (
         )}
       </Card>
 
-      {order.partsUsed.length > 0 && <CostSummaryCard orderId={order.id} refreshKey={order.partsUsed.length} />}
+      <CostSummaryCard orderId={order.id} refreshKey={order.partsUsed.length} />
     </div>
   );
 }
