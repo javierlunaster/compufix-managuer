@@ -203,9 +203,11 @@ export type RepairPartEntry = {
 
 export type RepairServiceEntry = {
   id: number;
-  serviceId: number;
+  serviceId?: number | null;
+  description?: string | null;
   price: string;
-  service: { id: number; code?: string | null; name: string };
+  cost: string;
+  service?: { id: number; code?: string | null; name: string } | null;
 };
 
 export type PaymentEntry = {
@@ -316,6 +318,8 @@ export type HardwareTestResult = {
 export type PartsCostSummary = {
   partsCost: number;
   partsRevenue: number;
+  servicesCost: number;
+  servicesRevenue: number;
   externalExpenses: number;
   externalExpenseMovements: {
     id: number;

@@ -314,7 +314,10 @@ export class DocumentsService {
       if (order.servicesUsed.length > 0) {
         pdf.table(
           ["Servicio realizado", "Valor"],
-          order.servicesUsed.map((s) => [s.service.name, formatCurrency(s.price)]),
+          // description siempre está poblado para registros nuevos (ver
+          // RepairServicesService.createWithTx); el fallback a
+          // service?.name cubre filas creadas antes de esa migración.
+          order.servicesUsed.map((s) => [s.description ?? s.service?.name ?? "Servicio", formatCurrency(s.price)]),
           [340, 100],
         );
       }

@@ -7,6 +7,7 @@ import { Prisma, QuotationStatus, RepairStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairPartsService } from "../repair-parts/repair-parts.service";
+import { RepairServicesService } from "../repair-services/repair-services.service";
 import { normalizeName } from "../common/utils/normalize-name.util";
 import { MailService } from "../mail/mail.service";
 import { formatCurrency } from "../common/utils/format.util";
@@ -43,6 +44,7 @@ export class QuotationsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private repairParts: RepairPartsService,
+    private repairServices: RepairServicesService,
     private mail: MailService,
   ) {}
 
@@ -417,18 +419,20 @@ export class QuotationsService {
             Number(item.unitPrice),
             actingUserId,
           );
-        } else if (item.type === "SERVICE" && item.serviceId) {
-          await tx.repairService.create({
-            data: {
-              repairOrderId: orderId,
-              serviceId: item.serviceId,
-              price: Number(item.unitPrice) * item.quantity,
-            },
+        } else if (item.type === "SERVICE" || item.type === "LABOR" || item.type === "OTHER") {
+          // Antes solo SERVICE (con serviceId) dejaba registro propio —
+          // LABOR y OTHER (mano de obra / cargos ad-hoc, sin servicio de
+          // catálogo) se perdían dentro de quotation.total sin ningún
+          // rastro por orden. Ahora los tres generan un RepairService
+          // (serviceId null para LABOR/OTHER, con la descripción de la
+          // cotización) para que aparezcan en "Trabajo realizado" del
+          // comprobante de entrega y se puedan costear.
+          await this.repairServices.createWithTx(tx, orderId, {
+            serviceId: item.serviceId ?? undefined,
+            description: item.description,
+            price: Number(item.unitPrice) * item.quantity,
           });
         }
-        // LABOR y OTHER: no tienen tabla propia en esta fase — su valor ya
-        // está incluido en quotation.total, que se asigna directo abajo a
-        // order.totalValue. Ver nota de simplificación en el README.
       }
 
       // Se SUMA al total existente, nunca se reemplaza: una orden puede

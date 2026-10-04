@@ -18,6 +18,7 @@ import { HardwareTestsModule } from "./hardware-tests/hardware-tests.module";
 import { RepairLogsModule } from "./repair-logs/repair-logs.module";
 import { InventoryModule } from "./inventory/inventory.module";
 import { RepairPartsModule } from "./repair-parts/repair-parts.module";
+import { RepairServicesModule } from "./repair-services/repair-services.module";
 import { ServicesModule } from "./services/services.module";
 import { QuotationsModule } from "./quotations/quotations.module";
 import { SuppliersModule } from "./suppliers/suppliers.module";
@@ -61,6 +62,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     RepairLogsModule,
     InventoryModule,
     RepairPartsModule,
+    RepairServicesModule,
     ServicesModule,
     QuotationsModule,
     SuppliersModule,

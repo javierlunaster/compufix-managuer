@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, DiagnosticMeasurement } from "@/lib/types";
+import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, RepairServiceEntry, Service, DiagnosticMeasurement } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
@@ -31,6 +31,7 @@ const TABS = [
   "Diagnóstico",
   "Bitácora",
   "Repuestos",
+  "Servicios",
   "Cotizaciones",
   "Pruebas de entrega",
   "Garantía",
@@ -82,6 +83,7 @@ export function RepairOrderDetailPage() {
       {tab === "Diagnóstico" && <DiagnosticsTab order={order} onChanged={reload} />}
       {tab === "Bitácora" && <LogsTab order={order} onChanged={reload} />}
       {tab === "Repuestos" && <PartsTab order={order} onChanged={reload} />}
+      {tab === "Servicios" && <ServicesTab order={order} onChanged={reload} />}
       {tab === "Cotizaciones" && <QuotationsTab order={order} onChanged={reload} />}
       {tab === "Pruebas de entrega" && <HardwareTestsTab order={order} onChanged={reload} />}
       {tab === "Garantía" && <WarrantyTab order={order} onChanged={reload} />}
@@ -1534,13 +1536,210 @@ function PartRow({
   );
 }
 
+// --- Pestaña: Servicios --------------------------------------------------
+
 /**
- * Costo de repuestos + egresos externos asignados desde Caja (ej. un
- * servicio subcontratado), ingreso por repuestos y ganancia de la orden
- * (Fase 6). Importante: esta ganancia todavía NO incluye mano de obra
- * propia — el modelo de datos todavía no tiene una tarifa de servicio
- * desglosada por orden, así que mostrarlo como "la ganancia total de la
- * reparación" sería engañoso.
+ * Aplicar un servicio directo a la orden — mismo patrón que la pestaña
+ * Repuestos, pero con dos modos: elegir un servicio del catálogo (precio y
+ * costo se autocompletan desde Service.basePrice/estimatedCost, editables)
+ * o un cargo de mano de obra ad-hoc sin servicio de catálogo detrás
+ * (descripción libre). Ver RepairServicesService en el backend.
+ */
+function ServicesTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
+  const { data: catalog } = useFetch(() => api.get<Service[]>("/services"), []);
+  const [mode, setMode] = useState<"catalog" | "manual">("catalog");
+  const [serviceId, setServiceId] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleServiceSelect(id: string) {
+    setServiceId(id);
+    const service = catalog?.find((s) => s.id === Number(id));
+    if (service) {
+      setPrice(service.basePrice);
+      setCost(service.estimatedCost ?? "");
+    }
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (mode === "catalog" && !serviceId) {
+      setError("Selecciona un servicio del catálogo");
+      return;
+    }
+    if (mode === "manual" && !description.trim()) {
+      setError("Escribe una descripción para el cargo");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(`/repair-orders/${order.id}/services`, {
+        serviceId: mode === "catalog" ? Number(serviceId) : undefined,
+        description: mode === "manual" ? description : undefined,
+        price: Number(price),
+        cost: cost ? Number(cost) : undefined,
+      });
+      setServiceId("");
+      setDescription("");
+      setPrice("");
+      setCost("");
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo agregar el servicio");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          title="Aplicar servicio"
+          subtitle="Mano de obra del catálogo, o un cargo manual sin servicio asociado"
+        />
+        <form onSubmit={handleAdd} className="space-y-3 p-4">
+          {error && <ErrorBanner message={error} />}
+
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setMode("catalog")}
+              className={`rounded px-3 py-1.5 ${mode === "catalog" ? "bg-accent text-bg" : "border border-border text-ink-muted"}`}
+            >
+              Del catálogo
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("manual")}
+              className={`rounded px-3 py-1.5 ${mode === "manual" ? "bg-accent text-bg" : "border border-border text-ink-muted"}`}
+            >
+              Cargo manual
+            </button>
+          </div>
+
+          {mode === "catalog" ? (
+            <Field label="Servicio">
+              <Select value={serviceId} onChange={(e) => handleServiceSelect(e.target.value)}>
+                <option value="">Selecciona un servicio…</option>
+                {catalog?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code ? `${s.code} — ` : ""}
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Descripción del cargo">
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="ej. Mano de obra - diagnóstico avanzado"
+              />
+            </Field>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Precio cobrado">
+              <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} required />
+            </Field>
+            <Field label="Costo para el taller (opcional)">
+              <Input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} />
+            </Field>
+          </div>
+
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? "Agregando…" : "Agregar"}
+          </Button>
+        </form>
+      </Card>
+
+      <Card>
+        {order.servicesUsed.length === 0 ? (
+          <EmptyState title="Sin servicios aplicados en esta orden" />
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
+                <th className="px-4 py-2">Servicio</th>
+                <th className="px-4 py-2">Precio</th>
+                <th className="px-4 py-2">Costo</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {order.servicesUsed.map((s) => (
+                <ServiceRow key={s.id} orderId={order.id} service={s} onChanged={onChanged} />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <CostSummaryCard orderId={order.id} refreshKey={order.servicesUsed.length} />
+    </div>
+  );
+}
+
+function ServiceRow({
+  orderId,
+  service,
+  onChanged,
+}: {
+  orderId: number;
+  service: RepairServiceEntry;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = service.description ?? service.service?.name ?? "Servicio";
+
+  async function handleRemove() {
+    const confirmed = confirm(`¿Quitar "${label}" de esta orden?`);
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete(`/repair-orders/${orderId}/services/${service.id}`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo quitar el servicio");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <tr className="border-b border-border last:border-0">
+      <td className="px-4 py-2 text-ink">
+        {label}
+        {error && <p className="text-xs text-danger">{error}</p>}
+      </td>
+      <td className="px-4 py-2 tabular text-ink">{formatCurrency(service.price)}</td>
+      <td className="px-4 py-2 tabular text-ink-muted">{formatCurrency(service.cost)}</td>
+      <td className="px-4 py-2">
+        <button
+          onClick={handleRemove}
+          disabled={busy}
+          className="text-xs text-danger hover:underline disabled:opacity-50"
+        >
+          Quitar
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Costo de repuestos, costo de servicios aplicados (mano de obra tarifada
+ * por servicio, ver ServicesTab/RepairServicesService) y egresos externos
+ * asignados desde Caja (ej. un servicio subcontratado) — los tres se
+ * restan del total cobrado para la ganancia de la orden.
  */
 function CostSummaryCard({ orderId, refreshKey }: { orderId: number; refreshKey: number }) {
   const { data: summary, loading, error } = useFetch(
@@ -1554,12 +1753,16 @@ function CostSummaryCard({ orderId, refreshKey }: { orderId: number; refreshKey:
     <Card>
       <CardHeader
         title="Costo y ganancia de la orden"
-        subtitle="Repuestos + egresos externos asignados desde Caja — no incluye mano de obra propia, que todavía no se desglosa por orden"
+        subtitle="Repuestos + servicios aplicados + egresos externos asignados desde Caja"
       />
-      <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-muted">Costo de repuestos</p>
           <p className="font-mono tabular text-ink">{formatCurrency(summary.partsCost)}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-ink-muted">Costo de servicios</p>
+          <p className="font-mono tabular text-ink">{formatCurrency(summary.servicesCost)}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-muted">Egresos externos</p>

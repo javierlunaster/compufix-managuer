@@ -151,22 +151,24 @@ export class RepairPartsService {
   /**
    * Resumen de costo/ganancia de la orden (sección 12 del brief: costo de
    * repuestos + mano de obra = costo total; precio cobrado; ganancia;
-   * margen). En esta fase, "mano de obra" como costo del taller todavía no
-   * se registra por separado (no hay tarifas horarias en el modelo), así
-   * que la ganancia todavía no incluye la mano de obra propia — sigue
-   * siendo una simplificación explícita del MVP, documentada aquí y en el
-   * README, hasta que un módulo de servicios/facturación permita
-   * desglosar mano de obra como un costo propio.
-   *
-   * Sí incluye, además del costo de repuestos, los egresos de Caja que se
-   * asignaron manualmente a esta orden (ver CashService.createMovement,
-   * campo repairOrderId) — el caso típico es un servicio externo
-   * subcontratado (una reparación mandada a hacer afuera) pagado de caja,
-   * que es un costo real de la orden aunque no pase por RepairPart.
+   * margen). Incluye el costo de repuestos, los servicios aplicados a la
+   * orden (RepairService.cost — ver RepairServicesService, snapshot de
+   * Service.estimatedCost al momento de aplicarlo) y los egresos de Caja
+   * que se asignaron manualmente a esta orden (ver CashService.createMovement,
+   * campo repairOrderId) — el caso típico de esto último es un servicio
+   * externo subcontratado (una reparación mandada a hacer afuera) pagado
+   * de caja, que es un costo real de la orden aunque no pase por
+   * RepairPart ni RepairService.
    */
   async costSummary(orderId: number) {
     const order = await this.ensureOrderExists(orderId);
     const parts = await this.findAllForOrder(orderId);
+    // Consulta directa a Prisma (no a RepairServicesService) para no sumar
+    // una dependencia de módulo nueva — mismo criterio ya usado aquí mismo
+    // con cashMovement, unas líneas abajo.
+    const services = await this.prisma.repairService.findMany({
+      where: { repairOrderId: orderId },
+    });
     const externalExpenseMovements = await this.prisma.cashMovement.findMany({
       where: { repairOrderId: orderId, type: CashMovementType.EXPENSE },
     });
@@ -179,17 +181,21 @@ export class RepairPartsService {
       (sum, p) => sum + Number(p.unitPrice) * p.quantity,
       0,
     );
+    const servicesCost = services.reduce((sum, s) => sum + Number(s.cost), 0);
+    const servicesRevenue = services.reduce((sum, s) => sum + Number(s.price), 0);
     const externalExpenses = externalExpenseMovements.reduce(
       (sum, m) => sum + Number(m.amount),
       0,
     );
     const totalCharged = Number(order.totalValue);
-    const profit = totalCharged - partsCost - externalExpenses;
+    const profit = totalCharged - partsCost - servicesCost - externalExpenses;
     const marginPct = totalCharged > 0 ? (profit / totalCharged) * 100 : 0;
 
     return {
       partsCost,
       partsRevenue,
+      servicesCost,
+      servicesRevenue,
       externalExpenses,
       externalExpenseMovements: externalExpenseMovements.map((m) => ({
         id: m.id,

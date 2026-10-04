@@ -772,13 +772,25 @@ model RepairPart {
   @@map("repair_parts")
 }
 
+// Un servicio aplicado a una orden — ya sea tomado del catálogo (serviceId)
+// o un cargo de mano de obra/otro ad-hoc sin servicio de catálogo detrás
+// (serviceId null, mismo caso que un ítem tipo LABOR/OTHER de cotización).
+// `description` guarda la etiqueta visible siempre (copiada de
+// Service.name cuando hay catálogo, o texto libre si no); nunca se lee
+// service.name directo para no romper si el servicio de catálogo cambia
+// de nombre después. `cost` es un snapshot de Service.estimatedCost al
+// momento de aplicarlo (0 si no hay catálogo o no tenía estimado) — mismo
+// criterio histórico que RepairPart.unitCost, y lo que permite que
+// RepairPartsService.costSummary() reste mano de obra de la ganancia.
 model RepairService {
   id            Int         @id @default(autoincrement())
   repairOrderId Int
   repairOrder   RepairOrder @relation(fields: [repairOrderId], references: [id])
-  serviceId     Int
-  service       Service     @relation(fields: [serviceId], references: [id])
+  serviceId     Int?
+  service       Service?    @relation(fields: [serviceId], references: [id])
+  description   String?
   price         Decimal     @db.Decimal(12, 2)
+  cost          Decimal     @default(0) @db.Decimal(12, 2)
 
   @@map("repair_services")
 }
