@@ -1,0 +1,366 @@
+/* Catálogo público de productos — mismo criterio que LandingPage.css:
+   todo selector prefijado con .catalog-page porque este CSS se importa
+   globalmente (Vite no aísla imports .css normales). Reutiliza las
+   variables de color de index.css en vez de inventar una paleta aparte. */
+
+.catalog-page,
+.catalog-page * {
+  box-sizing: border-box;
+}
+
+.catalog-page {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 100%;
+}
+
+.catalog-page a {
+  color: inherit;
+}
+.catalog-page a:focus-visible,
+.catalog-page button:focus-visible,
+.catalog-page input:focus-visible,
+.catalog-page select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.catalog-page h1,
+.catalog-page h3 {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.catalog-page .wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-inline: max(20px, env(safe-area-inset-left));
+}
+
+/* ---------- header (igual a LandingPage) ---------- */
+.catalog-page header.site {
+  border-bottom: 1px solid var(--border);
+}
+.catalog-page .header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 16px;
+  flex-wrap: wrap;
+}
+.catalog-page .brand {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-decoration: none;
+}
+.catalog-page .brand-logo {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 12px;
+  line-height: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  width: fit-content;
+}
+.catalog-page .brand-logo img {
+  display: block;
+  height: 30px;
+  width: auto;
+}
+.catalog-page .brand-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.catalog-page .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.catalog-page .phone-readout {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.catalog-page .phone-readout:hover {
+  color: var(--accent-strong);
+}
+.catalog-page .staff-link {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+.catalog-page .staff-link:hover {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
+.catalog-page .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: transform 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+}
+.catalog-page .btn-primary {
+  background: var(--accent);
+  color: #171201;
+}
+.catalog-page .btn-primary:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+/* ---------- intro ---------- */
+.catalog-page .catalog-intro {
+  padding-block: 44px 24px;
+}
+.catalog-page .eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+.catalog-page .catalog-intro h1 {
+  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+  margin-top: 8px;
+}
+.catalog-page .catalog-intro .lede {
+  max-width: 56ch;
+  color: var(--text-muted);
+  margin: 12px 0 0;
+}
+
+/* ---------- filtros ---------- */
+.catalog-page .catalog-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 24px;
+}
+.catalog-page .catalog-search {
+  flex: 1 1 240px;
+}
+.catalog-page .catalog-filters input,
+.catalog-page .catalog-filters select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.catalog-page .catalog-filters select {
+  flex: 0 1 200px;
+}
+
+/* ---------- grid ---------- */
+.catalog-page .catalog-grid-section {
+  padding-bottom: 56px;
+}
+.catalog-page .catalog-status {
+  color: var(--text-muted);
+  padding-block: 40px;
+  text-align: center;
+}
+.catalog-page .catalog-error {
+  color: var(--danger, #e05555);
+}
+.catalog-page .catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.catalog-page .product-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.catalog-page .product-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.catalog-page .product-photo {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--bg);
+  overflow: hidden;
+}
+.catalog-page .product-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.catalog-page .product-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.catalog-page .product-photo-placeholder svg {
+  width: 48px;
+  height: 48px;
+}
+
+.catalog-page .stock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  backdrop-filter: blur(2px);
+}
+.catalog-page .stock-badge.in-stock {
+  background: rgba(79, 168, 156, 0.18);
+  color: #4fa89c;
+  border: 1px solid rgba(79, 168, 156, 0.4);
+}
+.catalog-page .stock-badge.out-of-stock {
+  background: rgba(224, 85, 85, 0.15);
+  color: #e08080;
+  border: 1px solid rgba(224, 85, 85, 0.35);
+}
+
+.catalog-page .product-body {
+  padding: 14px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.catalog-page .product-brand {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+.catalog-page .product-name {
+  font-size: 0.98rem;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+.catalog-page .product-category {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+.catalog-page .product-price {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  margin: 10px 0 0;
+}
+.catalog-page .product-warranty {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+.catalog-page .product-whatsapp {
+  margin-top: 12px;
+  width: 100%;
+}
+
+/* ---------- paginación ---------- */
+.catalog-page .catalog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 36px;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+.catalog-page .catalog-pagination button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.catalog-page .catalog-pagination button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.catalog-page .catalog-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- footer (igual a LandingPage) ---------- */
+.catalog-page footer.site {
+  border-top: 1px solid var(--border);
+  padding-block: 22px;
+}
+.catalog-page .footer-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 560px) {
+  .catalog-page .catalog-filters {
+    flex-direction: column;
+  }
+  .catalog-page .catalog-filters select {
+    flex: 1 1 auto;
+  }
+}

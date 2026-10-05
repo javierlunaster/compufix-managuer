@@ -27,6 +27,9 @@ export function LandingPage() {
             <a className="phone-readout" href={`tel:${BRAND.phoneDial}`}>
               {BRAND.phoneDisplay}
             </a>
+            <Link className="staff-link" to="/catalogo">
+              Catálogo
+            </Link>
             <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
               WhatsApp
             </a>
@@ -54,6 +57,9 @@ export function LandingPage() {
                 <a className="btn btn-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
                   Escríbenos por WhatsApp
                 </a>
+                <Link className="btn btn-ghost" to="/catalogo">
+                  Ver catálogo de productos
+                </Link>
                 <a className="btn btn-ghost" href="#servicios">
                   Ver servicios
                 </a>

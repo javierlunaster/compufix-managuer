@@ -33,6 +33,7 @@ import { ImportModule } from "./import/import.module";
 import { HealthModule } from "./health/health.module";
 import { AttachmentsModule } from "./attachments/attachments.module";
 import { CustomerPortalModule } from "./customer-portal/customer-portal.module";
+import { PublicCatalogModule } from "./public-catalog/public-catalog.module";
 import { FinanceModule } from "./finance/finance.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
@@ -77,6 +78,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     HealthModule,
     AttachmentsModule,
     CustomerPortalModule,
+    PublicCatalogModule,
     FinanceModule,
   ],
   providers: [

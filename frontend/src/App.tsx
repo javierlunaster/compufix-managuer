@@ -37,6 +37,7 @@ import { UserDetailPage } from "@/pages/UserDetailPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
 import { LandingPage } from "@/pages/LandingPage";
+import { CatalogPage } from "@/pages/CatalogPage";
 import { FinancePage } from "@/pages/FinancePage";
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
@@ -83,6 +84,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Vitrina pública de productos — sin login, sin Layout, pensada
+          para compartir el link directo con un cliente. */}
+      <Route path="/catalogo" element={<CatalogPage />} />
 
       {/* Portal de clientes: rutas completamente separadas del personal —
           ni comparten Layout, ni ProtectedLayout, ni sesión. */}

@@ -665,3 +665,23 @@ export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {
     testedAt: string;
   }[];
 };
+
+// Vitrina pública (ver PublicCatalogController en el backend) — nunca
+// trae costo ni cantidad exacta de stock, solo lo seguro para mostrar sin
+// login a cualquiera con el link.
+export type PublicProduct = {
+  id: number;
+  sku: string;
+  description: string;
+  salePrice: string;
+  inStock: boolean;
+  warrantyMonths?: number | null;
+  category: { id: number; name: string };
+  brand?: { id: number; name: string } | null;
+  photos: { id: number; fileUrl: string }[];
+};
+
+export type PublicCatalogFilters = {
+  categories: { id: number; name: string }[];
+  brands: { id: number; name: string }[];
+};
