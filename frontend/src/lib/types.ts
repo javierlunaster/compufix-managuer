@@ -666,6 +666,35 @@ export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {
   }[];
 };
 
+// Marca y personalización del negocio (ver BusinessSettingsController en
+// el backend) — fila única editable desde la página "Configuración"
+// (solo Administrador), reemplazando las variables VITE_* horneadas al
+// build por valores que cualquier cliente puede cambiar sin un redespliegue.
+export type BusinessSettings = {
+  id: number;
+  businessName: string;
+  shortName: string;
+  tagline: string;
+  locationTag: string;
+  footerLocation: string;
+  footerTagline: string;
+  phoneDisplay?: string | null;
+  phoneDial?: string | null;
+  whatsappNumber?: string | null;
+  whatsappMessage: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  addressCity?: string | null;
+  mapsUrlOverride?: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+  youtubeUrl?: string | null;
+  logoUrl?: string | null;
+  accentColor: string;
+  accentStrongColor: string;
+  updatedAt: string;
+};
+
 // Vitrina pública (ver PublicCatalogController en el backend) — nunca
 // trae costo ni cantidad exacta de stock, solo lo seguro para mostrar sin
 // login a cualquiera con el link.

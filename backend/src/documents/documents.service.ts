@@ -3,8 +3,8 @@ import { HardwareTestCategory, HardwareTestStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
+import { BusinessSettingsService } from "../business-settings/business-settings.service";
 import { PdfBuilder } from "../common/pdf/pdf-builder.util";
-import { BUSINESS_NAME } from "../common/config/branding.config";
 import { formatCurrency, formatDate, formatDateTime } from "../common/utils/format.util";
 import { REPAIR_STATUS_LABELS } from "../common/utils/repair-status-labels.util";
 
@@ -28,6 +28,7 @@ export class DocumentsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private repairOrders: RepairOrdersService,
+    private businessSettings: BusinessSettingsService,
   ) {}
 
   /**
@@ -68,11 +69,14 @@ export class DocumentsService {
    */
   async generateTechnicalReport(orderId: number, actingUserId: number) {
     const order = await this.repairOrders.findOne(orderId);
+    const branding = await this.businessSettings.getBrandingForDocuments();
 
     const pdf = new PdfBuilder();
     pdf.header({
       docTitle: "Informe técnico",
       docSubtitle: `Orden ${order.orderCode} · Generado el ${formatDateTime(new Date())}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
     });
 
     pdf.sectionTitle("Datos del cliente").keyValueGrid([
@@ -201,7 +205,7 @@ export class DocumentsService {
     ]);
     pdf.signatureLine("Firma del técnico responsable");
 
-    pdf.footer(`${BUSINESS_NAME} · Informe técnico · Orden ${order.orderCode}`);
+    pdf.footer(`${branding.businessName} · Informe técnico · Orden ${order.orderCode}`);
 
     const buffer = await pdf.build();
 
@@ -218,11 +222,14 @@ export class DocumentsService {
   /** Comprobante de ingreso (sección 6/23 del brief). */
   async generateIntakeReceipt(orderId: number) {
     const order = await this.repairOrders.findOne(orderId);
+    const branding = await this.businessSettings.getBrandingForDocuments();
 
     const pdf = new PdfBuilder();
     pdf.header({
       docTitle: "Comprobante de ingreso",
       docSubtitle: `Orden ${order.orderCode} · ${formatDate(order.entryDate)}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
     });
 
     pdf.sectionTitle("Cliente").keyValueGrid([
@@ -258,7 +265,7 @@ export class DocumentsService {
     pdf.signatureLine("Firma del cliente");
     pdf.signatureLine("Recibido por (taller)");
 
-    pdf.footer(`${BUSINESS_NAME} · Comprobante de ingreso · Orden ${order.orderCode}`);
+    pdf.footer(`${branding.businessName} · Comprobante de ingreso · Orden ${order.orderCode}`);
 
     const buffer = await pdf.build();
     return { buffer, filename: `comprobante-ingreso-${order.orderCode}.pdf` };
@@ -267,11 +274,14 @@ export class DocumentsService {
   /** Comprobante de entrega (sección 23 del brief). */
   async generateDeliveryReceipt(orderId: number) {
     const order = await this.repairOrders.findOne(orderId);
+    const branding = await this.businessSettings.getBrandingForDocuments();
 
     const pdf = new PdfBuilder();
     pdf.header({
       docTitle: "Comprobante de entrega",
       docSubtitle: `Orden ${order.orderCode}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
     });
 
     pdf.sectionTitle("Cliente y equipo").keyValueGrid([
@@ -369,7 +379,7 @@ export class DocumentsService {
       pdf.signatureLine("Firma de recibido a satisfacción — Cliente");
     }
 
-    pdf.footer(`${BUSINESS_NAME} · Comprobante de entrega · Orden ${order.orderCode}`);
+    pdf.footer(`${branding.businessName} · Comprobante de entrega · Orden ${order.orderCode}`);
 
     const buffer = await pdf.build();
     return { buffer, filename: `comprobante-entrega-${order.orderCode}.pdf` };
@@ -393,9 +403,15 @@ export class DocumentsService {
     }
 
     const order = warranty.repairOrder;
+    const branding = await this.businessSettings.getBrandingForDocuments();
 
     const pdf = new PdfBuilder();
-    pdf.header({ docTitle: "Certificado de garantía", docSubtitle: `Orden ${order.orderCode}` });
+    pdf.header({
+      docTitle: "Certificado de garantía",
+      docSubtitle: `Orden ${order.orderCode}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
+    });
 
     pdf.keyValueGrid([
       ["Cliente", order.customer.fullName],
@@ -411,7 +427,7 @@ export class DocumentsService {
         "No cubre daños por mal uso, líquidos, caídas, o intervención de terceros no autorizados.",
     );
 
-    pdf.footer(`${BUSINESS_NAME} · Certificado de garantía · Orden ${order.orderCode}`);
+    pdf.footer(`${branding.businessName} · Certificado de garantía · Orden ${order.orderCode}`);
 
     const buffer = await pdf.build();
     return { buffer, filename: `garantia-${order.orderCode}.pdf` };
@@ -441,11 +457,14 @@ export class DocumentsService {
     if (!quotation) {
       throw new NotFoundException("Cotización no encontrada");
     }
+    const branding = await this.businessSettings.getBrandingForDocuments();
 
     const pdf = new PdfBuilder();
     pdf.header({
       docTitle: "Cotización",
       docSubtitle: `${quotation.quotationNumber} · ${formatDate(quotation.date)}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
     });
 
     pdf.sectionTitle("Cliente").keyValueGrid([
@@ -502,7 +521,7 @@ export class DocumentsService {
         "Para aprobar esta cotización, comunícate con el taller.",
     );
 
-    pdf.footer(`${BUSINESS_NAME} · Cotización ${quotation.quotationNumber}`);
+    pdf.footer(`${branding.businessName} · Cotización ${quotation.quotationNumber}`);
 
     const buffer = await pdf.build();
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Resend } from "resend";
 import { orderReadyEmail, orderReceivedEmail, quotationSentEmail } from "./templates";
+import { BusinessSettingsService } from "../business-settings/business-settings.service";
 
 /**
  * A diferencia de StorageService (Supabase Storage es indispensable — sin
@@ -15,6 +16,8 @@ export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private client: Resend | null = null;
   private from: string;
+
+  constructor(private businessSettings: BusinessSettingsService) {}
 
   onModuleInit() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -63,12 +66,14 @@ export class MailService implements OnModuleInit {
     deviceLabel: string;
     reportedIssue: string;
   }): Promise<void> {
+    const { businessName } = await this.businessSettings.getBrandingForDocuments();
     const { subject, html } = orderReceivedEmail({
       customerName: params.customerName,
       orderCode: params.orderCode,
       deviceLabel: params.deviceLabel,
       reportedIssue: params.reportedIssue,
       portalUrl: this.portalUrl("/portal/login"),
+      businessName,
     });
     await this.send(params.to, subject, html);
   }
@@ -79,11 +84,13 @@ export class MailService implements OnModuleInit {
     quotationNumber: string;
     total: string;
   }): Promise<void> {
+    const { businessName } = await this.businessSettings.getBrandingForDocuments();
     const { subject, html } = quotationSentEmail({
       customerName: params.customerName,
       quotationNumber: params.quotationNumber,
       total: params.total,
       portalUrl: this.portalUrl("/portal/login"),
+      businessName,
     });
     await this.send(params.to, subject, html);
   }
@@ -95,12 +102,14 @@ export class MailService implements OnModuleInit {
     deviceLabel: string;
     balance: string;
   }): Promise<void> {
+    const { businessName } = await this.businessSettings.getBrandingForDocuments();
     const { subject, html } = orderReadyEmail({
       customerName: params.customerName,
       orderCode: params.orderCode,
       deviceLabel: params.deviceLabel,
       balance: params.balance,
       portalUrl: this.portalUrl("/portal/login"),
+      businessName,
     });
     await this.send(params.to, subject, html);
   }

@@ -59,11 +59,24 @@ export class PdfBuilder {
     this.doc = new PDFDocument({ margin: 50, size: "letter", bufferPages: true });
   }
 
-  header(params: { docTitle: string; docSubtitle?: string }) {
+  // businessName/businessTagline son opcionales a propósito: caen de
+  // nuevo a las constantes de .env si el llamador no los pasa (compatibilidad
+  // hacia atrás), pero DocumentsService siempre los pasa desde
+  // BusinessSettingsService para que el PDF refleje lo que el cliente
+  // haya editado en Configuración, no lo que había al desplegar.
+  header(params: {
+    docTitle: string;
+    docSubtitle?: string;
+    businessName?: string;
+    businessTagline?: string;
+  }) {
+    const businessName = params.businessName ?? BUSINESS_NAME;
+    const businessTagline = params.businessTagline ?? BUSINESS_TAGLINE;
+
     this.doc
       .fontSize(9)
       .fillColor("#6b7280")
-      .text(sanitizeForPdf(`${BUSINESS_NAME.toUpperCase()} — ${BUSINESS_TAGLINE.toUpperCase()}`), {
+      .text(sanitizeForPdf(`${businessName.toUpperCase()} — ${businessTagline.toUpperCase()}`), {
         align: "left",
       });
 

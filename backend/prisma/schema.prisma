@@ -39,6 +39,50 @@ enum RecordStatus {
   INACTIVE
 }
 
+// Marca del negocio (nombre, logo, contacto, redes, color de acento) —
+// editable desde la página "Configuración" (solo Administrador), en vez
+// de vivir solo en variables de entorno horneadas al build. Fila única
+// con id fijo = 1 (BusinessSettingsService siempre lee/escribe ese id, lo
+// crea con los valores por defecto de CompuFix si todavía no existe —
+// así una base de datos ya desplegada no necesita una migración de datos
+// para empezar a funcionar). Cada cliente tiene su propia base de datos
+// (ver DEPLOY_RAILWAY_SUPABASE.md), así que esta fila nunca se mezcla
+// entre negocios distintos.
+model BusinessSettings {
+  id Int @id @default(1)
+
+  businessName    String  @default("CompuFix Soluciones Integrales")
+  shortName       String  @default("CompuFix")
+  tagline         String  @default("Taller de reparación de computadores")
+  locationTag     String  @default("Cartagena, Bolívar")
+  footerLocation  String  @default("Cartagena, Colombia")
+  footerTagline   String  @default("Diagnóstico · Reparación · Repuestos")
+  phoneDisplay    String? @default("301 395 1619")
+  phoneDial       String? @default("+573013951619")
+  whatsappNumber  String? @default("573013951619")
+  whatsappMessage String  @default("Hola, quiero una cotización para mi equipo")
+  addressLine1    String?
+  addressLine2    String?
+  addressCity     String?
+  mapsUrlOverride String?
+  facebookUrl     String?
+  instagramUrl    String?
+  youtubeUrl      String?
+  logoUrl         String?
+
+  // Color de marca — el único par que se deja personalizar (ver
+  // tailwind.config.js: `accent`/`accent-strong` son las dos variables
+  // CSS que de verdad distinguen la marca de un negocio del otro; el
+  // resto de la paleta oscura es una decisión de diseño del sistema, no
+  // algo que convenga que un cliente rompa sin querer).
+  accentColor       String @default("#c2884d")
+  accentStrongColor String @default("#e3a868")
+
+  updatedAt DateTime @updatedAt
+
+  @@map("business_settings")
+}
+
 model Role {
   id          Int              @id @default(autoincrement())
   name        String           @unique // Administrador, Gerente, Técnico, Recepción, Inventario, Ventas

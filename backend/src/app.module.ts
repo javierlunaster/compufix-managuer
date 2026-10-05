@@ -10,6 +10,7 @@ import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { RolesModule } from "./roles/roles.module";
 import { CatalogsModule } from "./catalogs/catalogs.module";
+import { BusinessSettingsModule } from "./business-settings/business-settings.module";
 import { CustomersModule } from "./customers/customers.module";
 import { DevicesModule } from "./devices/devices.module";
 import { RepairOrdersModule } from "./repair-orders/repair-orders.module";
@@ -55,6 +56,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     UsersModule,
     RolesModule,
     CatalogsModule,
+    BusinessSettingsModule,
     CustomersModule,
     DevicesModule,
     RepairOrdersModule,

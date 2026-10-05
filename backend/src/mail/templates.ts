@@ -1,13 +1,15 @@
-import { BUSINESS_NAME } from "../common/config/branding.config";
-
 /**
  * Envoltorio HTML común a los 3 correos — estilos en línea a propósito
  * (Gmail/Outlook/etc. ignoran o recortan <style> en el <head> de un
  * correo, así que cualquier CSS que importe de verdad tiene que ir
  * inline). Nada de imágenes ni fuentes externas: se mantiene simple para
  * que se vea igual de bien en cualquier cliente de correo.
+ *
+ * `businessName` lo pasa MailService (desde BusinessSettingsService) —
+ * no se importa como constante aquí para que un cambio en la página de
+ * Configuración se refleje en el próximo correo sin redesplegar nada.
  */
-function emailLayout(title: string, bodyHtml: string): string {
+function emailLayout(title: string, bodyHtml: string, businessName: string): string {
   return `
 <!doctype html>
 <html lang="es">
@@ -18,7 +20,7 @@ function emailLayout(title: string, bodyHtml: string): string {
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
             <tr>
               <td style="background-color:#111827;padding:20px 28px;">
-                <span style="color:#ffffff;font-size:15px;font-weight:bold;letter-spacing:0.3px;">${BUSINESS_NAME}</span>
+                <span style="color:#ffffff;font-size:15px;font-weight:bold;letter-spacing:0.3px;">${businessName}</span>
               </td>
             </tr>
             <tr>
@@ -30,7 +32,7 @@ function emailLayout(title: string, bodyHtml: string): string {
             <tr>
               <td style="padding:16px 28px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
                 <p style="margin:0;font-size:11px;color:#9ca3af;">
-                  Este es un mensaje automático de ${BUSINESS_NAME} — no respondas a este correo.
+                  Este es un mensaje automático de ${businessName} — no respondas a este correo.
                 </p>
               </td>
             </tr>
@@ -61,8 +63,9 @@ export function orderReceivedEmail(params: {
   deviceLabel: string;
   reportedIssue: string;
   portalUrl: string;
+  businessName: string;
 }): { subject: string; html: string } {
-  const { customerName, orderCode, deviceLabel, reportedIssue, portalUrl } = params;
+  const { customerName, orderCode, deviceLabel, reportedIssue, portalUrl, businessName } = params;
   const body = `
     <p>Hola ${customerName},</p>
     <p>Confirmamos que recibimos tu equipo <strong>${deviceLabel}</strong> en el taller, bajo la orden <strong>${orderCode}</strong>.</p>
@@ -70,7 +73,10 @@ export function orderReceivedEmail(params: {
     <p>Te avisaremos por este mismo medio cuando tengamos una cotización lista o cuando el equipo esté listo para recoger.</p>
     ${portalButton(portalUrl, "Ver el estado de mi reparación")}
   `;
-  return { subject: `Recibimos tu equipo — Orden ${orderCode}`, html: emailLayout("Equipo recibido", body) };
+  return {
+    subject: `Recibimos tu equipo — Orden ${orderCode}`,
+    html: emailLayout("Equipo recibido", body, businessName),
+  };
 }
 
 export function quotationSentEmail(params: {
@@ -78,8 +84,9 @@ export function quotationSentEmail(params: {
   quotationNumber: string;
   total: string;
   portalUrl: string;
+  businessName: string;
 }): { subject: string; html: string } {
-  const { customerName, quotationNumber, total, portalUrl } = params;
+  const { customerName, quotationNumber, total, portalUrl, businessName } = params;
   const body = `
     <p>Hola ${customerName},</p>
     <p>Tu cotización <strong>${quotationNumber}</strong> ya está lista, por un total de <strong>${total}</strong>.</p>
@@ -88,7 +95,7 @@ export function quotationSentEmail(params: {
   `;
   return {
     subject: `Tu cotización ${quotationNumber} está lista`,
-    html: emailLayout("Cotización lista", body),
+    html: emailLayout("Cotización lista", body, businessName),
   };
 }
 
@@ -98,8 +105,9 @@ export function orderReadyEmail(params: {
   deviceLabel: string;
   balance: string;
   portalUrl: string;
+  businessName: string;
 }): { subject: string; html: string } {
-  const { customerName, orderCode, deviceLabel, balance, portalUrl } = params;
+  const { customerName, orderCode, deviceLabel, balance, portalUrl, businessName } = params;
   const balanceLine =
     Number(balance) > 0
       ? `<p><strong>Saldo pendiente:</strong> ${balance}</p>`
@@ -110,5 +118,8 @@ export function orderReadyEmail(params: {
     ${balanceLine}
     ${portalButton(portalUrl, "Ver el detalle de mi orden")}
   `;
-  return { subject: `Tu equipo está listo — Orden ${orderCode}`, html: emailLayout("Equipo listo para entrega", body) };
+  return {
+    subject: `Tu equipo está listo — Orden ${orderCode}`,
+    html: emailLayout("Equipo listo para entrega", body, businessName),
+  };
 }

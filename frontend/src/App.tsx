@@ -1,6 +1,10 @@
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { PortalAuthProvider } from "@/lib/portalAuth";
+import { api } from "@/lib/api";
+import { applyBusinessSettings } from "@/lib/branding";
+import type { BusinessSettings } from "@/lib/types";
 import { Layout } from "@/components/Layout";
 import { PortalProtectedLayout } from "@/components/PortalLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -35,6 +39,7 @@ import { UsersPage } from "@/pages/UsersPage";
 import { CatalogsPage } from "@/pages/CatalogsPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { AccountPage } from "@/pages/AccountPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { CatalogPage } from "@/pages/CatalogPage";
@@ -151,6 +156,7 @@ function AppRoutes() {
       <Route path="/users/:id" element={<ProtectedLayout><UserDetailPage /></ProtectedLayout>} />
       <Route path="/catalogs" element={<ProtectedLayout><CatalogsPage /></ProtectedLayout>} />
       <Route path="/account" element={<ProtectedLayout><AccountPage /></ProtectedLayout>} />
+      <Route path="/settings" element={<ProtectedLayout><SettingsPage /></ProtectedLayout>} />
       <Route path="/devices/:id" element={<ProtectedLayout><DeviceDetailPage /></ProtectedLayout>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -158,7 +164,34 @@ function AppRoutes() {
   );
 }
 
+// La marca (nombre, logo, colores) vive en `BRAND` (lib/branding.ts), un
+// objeto mutable leído por 6+ pantallas distintas. Este efecto corre una
+// sola vez al arrancar la app, trae lo guardado en Configuración (endpoint
+// público, no requiere sesión) y lo aplica con `applyBusinessSettings()`
+// — el `setReady` fuerza un único re-render de todo el árbol para que esas
+// pantallas, que ya se habían montado con los valores de respaldo, vuelvan
+// a leer `BRAND` con los valores reales sin que cada una tenga que hacer
+// su propio fetch.
+function useBusinessBranding() {
+  const [, setReady] = useState(0);
+
+  useEffect(() => {
+    api
+      .get<BusinessSettings>("/business-settings")
+      .then((settings) => {
+        applyBusinessSettings(settings);
+        setReady((n) => n + 1);
+      })
+      .catch(() => {
+        // Sin conexión o backend caído al momento de cargar: se sigue con
+        // los valores de respaldo (VITE_*) — nunca bloquea la app.
+      });
+  }, []);
+}
+
 export function App() {
+  useBusinessBranding();
+
   return (
     <AuthProvider>
       <PortalAuthProvider>
