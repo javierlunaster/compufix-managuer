@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePortalAuth } from "@/lib/portalAuth";
+import { PORTAL_SESSION_EXPIRED_KEY, usePortalAuth } from "@/lib/portalAuth";
 import { PortalApiError } from "@/lib/portalApi";
 import { BRAND } from "@/lib/branding";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
@@ -11,6 +11,14 @@ export function PortalLoginPage() {
   const [documentId, setDocumentId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(PORTAL_SESSION_EXPIRED_KEY)) {
+      sessionStorage.removeItem(PORTAL_SESSION_EXPIRED_KEY);
+      setSessionExpired(true);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +48,11 @@ export function PortalLoginPage() {
 
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            {sessionExpired && !error && (
+              <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+                Tu sesión expiró — inicia sesión de nuevo.
+              </p>
+            )}
             {error && <ErrorBanner message={error} />}
             <Field label="Número de documento">
               <Input

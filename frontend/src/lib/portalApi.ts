@@ -21,6 +21,18 @@ export function clearPortalToken() {
   localStorage.removeItem(PORTAL_TOKEN_KEY);
 }
 
+// Mismo mecanismo que UNAUTHORIZED_EVENT en lib/api.ts, con su propio
+// nombre de evento — portal y personal son sesiones independientes en el
+// mismo navegador (ver PORTAL_TOKEN_KEY arriba), así que un token de
+// portal vencido no debe cerrar una sesión de personal abierta en otra
+// pestaña, ni viceversa.
+export const PORTAL_UNAUTHORIZED_EVENT = "compufix:portal-unauthorized";
+
+function handlePortalUnauthorized() {
+  clearPortalToken();
+  window.dispatchEvent(new Event(PORTAL_UNAUTHORIZED_EVENT));
+}
+
 export class PortalApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -54,7 +66,7 @@ async function portalRequest<T>(
         ? String((payload as { message: unknown }).message)
         : null) ?? `Error ${response.status}`;
     if (response.status === 401) {
-      clearPortalToken();
+      handlePortalUnauthorized();
     }
     throw new PortalApiError(response.status, message);
   }
@@ -87,7 +99,7 @@ async function portalRequestForm<T>(path: string, formData: FormData): Promise<T
         ? String((payload as { message: unknown }).message)
         : null) ?? `Error ${response.status}`;
     if (response.status === 401) {
-      clearPortalToken();
+      handlePortalUnauthorized();
     }
     throw new PortalApiError(response.status, message);
   }

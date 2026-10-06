@@ -1,5 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { portalApi, clearPortalToken, getPortalToken, setPortalToken } from "./portalApi";
+import {
+  portalApi,
+  clearPortalToken,
+  getPortalToken,
+  setPortalToken,
+  PORTAL_UNAUTHORIZED_EVENT,
+} from "./portalApi";
 
 type PortalCustomer = { id: number; fullName: string };
 type PortalLoginResponse = { accessToken: string; customer: PortalCustomer };
@@ -14,6 +20,7 @@ type PortalAuthContextValue = {
 const PortalAuthContext = createContext<PortalAuthContextValue | null>(null);
 
 const PORTAL_CUSTOMER_KEY = "compufix_portal_customer";
+export const PORTAL_SESSION_EXPIRED_KEY = "compufix_portal_session_expired";
 
 export function PortalAuthProvider({ children }: { children: ReactNode }) {
   const [customer, setCustomer] = useState<PortalCustomer | null>(null);
@@ -26,6 +33,21 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
       setCustomer(JSON.parse(stored));
     }
     setLoading(false);
+  }, []);
+
+  // Mismo mecanismo que en lib/auth.tsx: si el token vence mientras el
+  // cliente sigue en el portal, portalApi.ts avisa con este evento para
+  // limpiar la sesión en memoria y dejar que PortalProtectedLayout
+  // redirija a /portal/login, en vez de quedarse con el menú visible y
+  // cada acción fallando.
+  useEffect(() => {
+    function handleUnauthorized() {
+      sessionStorage.setItem(PORTAL_SESSION_EXPIRED_KEY, "1");
+      localStorage.removeItem(PORTAL_CUSTOMER_KEY);
+      setCustomer(null);
+    }
+    window.addEventListener(PORTAL_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(PORTAL_UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
   // Usuario y contraseña son el mismo número de documento — el propio

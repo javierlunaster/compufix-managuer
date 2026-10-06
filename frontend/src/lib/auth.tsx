@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, clearToken, getToken, setToken } from "./api";
+import { api, clearToken, getToken, setToken, UNAUTHORIZED_EVENT } from "./api";
 import type { AuthUser } from "./types";
 
 type LoginResponse = { accessToken: string; user: AuthUser };
@@ -14,6 +14,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const USER_KEY = "compufix_user";
+export const SESSION_EXPIRED_KEY = "compufix_session_expired";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -30,6 +31,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
+  }, []);
+
+  // Si el token vence mientras la persona ya está adentro (sin recargar
+  // la página), api.ts lo detecta en la siguiente llamada y avisa con
+  // este evento — sin este listener, `user` se quedaba poblado en
+  // memoria para siempre y ProtectedLayout nunca mandaba de vuelta a
+  // /login, dejando el menú visible con cada acción fallando en
+  // "Unauthorized".
+  useEffect(() => {
+    function handleUnauthorized() {
+      // Bandera de una sola lectura: LoginPage la revisa al montar para
+      // mostrar "tu sesión expiró" y la borra de inmediato — así no se
+      // confunde con un login normal (sin sesión previa) donde no debe
+      // aparecer ese aviso.
+      sessionStorage.setItem(SESSION_EXPIRED_KEY, "1");
+      localStorage.removeItem(USER_KEY);
+      setUser(null);
+    }
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);
 
   async function login(username: string, password: string) {

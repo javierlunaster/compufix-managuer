@@ -29,6 +29,20 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Se dispara cuando el backend rechaza el token (venció o es inválido).
+// api.ts solo limpia el localStorage — no tiene forma de tocar el estado
+// de React directamente — así que avisa por este evento y AuthProvider
+// (lib/auth.tsx) es quien escucha, limpia el usuario en memoria y deja
+// que ProtectedLayout haga la redirección a /login. Sin esto, el menú y
+// la pantalla se quedaban como si la sesión siguiera activa, mostrando
+// "Unauthorized" en vez de mandar a la persona a iniciar sesión de nuevo.
+export const UNAUTHORIZED_EVENT = "compufix:unauthorized";
+
+function handleUnauthorized() {
+  clearToken();
+  window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+}
+
 export class ApiError extends Error {
   status: number;
   payload: unknown;
@@ -92,10 +106,12 @@ async function request<T>(
           : String((payload as { message: unknown }).message)
         : null) ?? `Error ${response.status}`;
 
-    // Si el token expiró o es inválido, se limpia para forzar un login
-    // limpio en vez de dejar a la persona atrapada en pantallas rotas.
+    // Si el token expiró o es inválido, se limpia y se avisa (ver
+    // UNAUTHORIZED_EVENT) para forzar un login limpio en vez de dejar a la
+    // persona atrapada en pantallas que siguen mostrando el menú pero
+    // fallan con "Unauthorized" en cada acción.
     if (response.status === 401) {
-      clearToken();
+      handleUnauthorized();
     }
 
     throw new ApiError(response.status, message, payload);
@@ -133,7 +149,7 @@ async function requestForm<T>(path: string, formData: FormData): Promise<T> {
           : String((payload as { message: unknown }).message)
         : null) ?? `Error ${response.status}`;
     if (response.status === 401) {
-      clearToken();
+      handleUnauthorized();
     }
     throw new ApiError(response.status, message, payload);
   }
@@ -163,6 +179,9 @@ async function downloadFile(path: string, fallbackFilename: string): Promise<voi
       (payload && typeof payload === "object" && "message" in payload
         ? String((payload as { message: unknown }).message)
         : null) ?? `Error ${response.status}`;
+    if (response.status === 401) {
+      handleUnauthorized();
+    }
     throw new ApiError(response.status, message, payload);
   }
 

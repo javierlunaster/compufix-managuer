@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
+import { SESSION_EXPIRED_KEY, useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { BRAND } from "@/lib/branding";
 import { Button, ErrorBanner, Field, Input } from "@/components/ui";
@@ -12,6 +12,14 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(SESSION_EXPIRED_KEY)) {
+      sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+      setSessionExpired(true);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +50,11 @@ export function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded border border-border bg-surface p-6">
+          {sessionExpired && !error && (
+            <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+              Tu sesión expiró — inicia sesión de nuevo.
+            </p>
+          )}
           {error && <ErrorBanner message={error} />}
 
           <Field label="Usuario">
