@@ -279,9 +279,15 @@ function NewProductForm({
   const [minStock, setMinStock] = useState("0");
   const [initialStock, setInitialStock] = useState("0");
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [photoFiles, setPhotoFiles] = useState<FileList | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Si el producto se crea pero la subida de fotos falla, no tiene caso
+  // perder esos datos — se guarda el id para ofrecer un enlace directo al
+  // producto ya creado, en vez de obligar a buscarlo de nuevo (justo lo
+  // que esta función evita en el camino feliz).
+  const [createdProductId, setCreatedProductId] = useState<number | null>(null);
 
   async function handleAddCategory() {
     if (!newCategoryName.trim()) return;
@@ -297,13 +303,14 @@ function NewProductForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setCreatedProductId(null);
     if (!categoryId) {
       setError("Selecciona o crea una categoría primero");
       return;
     }
     setSaving(true);
     try {
-      await api.post("/products", {
+      const created = await api.post<Product>("/products", {
         sku,
         description,
         categoryId: Number(categoryId),
@@ -313,6 +320,25 @@ function NewProductForm({
         minStock: Number(minStock) || 0,
         initialStock: Number(initialStock) || 0,
       });
+
+      if (photoFiles && photoFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          Array.from(photoFiles).forEach((f) => formData.append("files", f));
+          await api.postForm(`/products/${created.id}/photos`, formData);
+        } catch (photoErr) {
+          // El producto ya quedó creado — no tiene sentido perderlo por un
+          // error al subir las fotos. Se deja un enlace directo al
+          // producto en vez de obligar a buscarlo en la lista.
+          setCreatedProductId(created.id);
+          setError(
+            (photoErr instanceof ApiError ? photoErr.message : "No se pudieron subir las fotos") +
+              " — el producto sí se creó, entra a su ficha para intentar de nuevo.",
+          );
+          return;
+        }
+      }
+
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear el producto");
@@ -326,6 +352,13 @@ function NewProductForm({
       <CardHeader title="Nuevo producto" />
       <form onSubmit={handleSubmit} className="space-y-3 p-4">
         {error && <ErrorBanner message={error} />}
+        {createdProductId && (
+          <p className="text-sm text-ink-muted">
+            <Link to={`/inventory/${createdProductId}`} className="text-accent hover:underline">
+              Ir a la ficha del producto creado
+            </Link>
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="SKU">
@@ -401,6 +434,22 @@ function NewProductForm({
             />
           </Field>
         </div>
+
+        <Field label="Fotos para el catálogo (opcional)">
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setPhotoFiles(e.target.files)}
+            className="w-full text-xs text-ink-muted file:mr-2 file:rounded file:border file:border-border file:bg-surface-raised file:px-2 file:py-1 file:text-xs file:text-ink"
+          />
+          {photoFiles && photoFiles.length > 0 && (
+            <p className="mt-1 text-xs text-ink-muted">
+              {photoFiles.length} foto{photoFiles.length > 1 ? "s" : ""} seleccionada
+              {photoFiles.length > 1 ? "s" : ""} — se suben al crear el producto
+            </p>
+          )}
+        </Field>
 
         <Button type="submit" variant="primary" disabled={saving}>
           {saving ? "Guardando…" : "Crear producto"}
