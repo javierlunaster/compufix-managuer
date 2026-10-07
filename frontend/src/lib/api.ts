@@ -205,7 +205,7 @@ export const api = {
     request<T>(path, { method: "GET", query }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, body?: unknown) => request<T>(path, { method: "DELETE", body }),
   postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData),
   download: (path: string, fallbackFilename: string) => downloadFile(path, fallbackFilename),
 };

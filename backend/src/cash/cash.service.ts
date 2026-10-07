@@ -241,6 +241,45 @@ export class CashService {
   }
 
   /**
+   * Egreso real por devolver dinero a un cliente (ver PaymentsService.refund)
+   * — típicamente porque una orden quedó con saldo a favor del cliente tras
+   * quitar un repuesto/servicio cotizado que al final no se usó. A
+   * diferencia de reverseSaleIncomeIfStillOpen (que anula un ingreso que
+   * nunca debió contarse), este SÍ es un gasto real de caja: el abono
+   * original se queda en el historial tal cual, y esto es un evento nuevo
+   * e independiente. Por eso usa `repairOrderId` (metadata, cuenta en
+   * Finanzas) y no `paymentId` (que FinanceService excluye para no
+   * duplicar).
+   */
+  async recordRefundExpenseIfRegisterOpen(
+    tx: PrismaTxClient,
+    params: {
+      category: string;
+      amount: number;
+      repairOrderId: number;
+      userId: number;
+      description?: string;
+    },
+  ) {
+    const current = await tx.cashRegister.findFirst({ where: { status: "OPEN" } });
+    if (!current) {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: current.id,
+        type: CashMovementType.EXPENSE,
+        category: params.category,
+        amount: params.amount,
+        repairOrderId: params.repairOrderId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
+
+  /**
    * Reversa el ingreso de una venta cancelada (ver SalesService.cancel) —
    * un egreso por el mismo monto, marcado con el mismo `saleId` para que
    * FinanceService lo excluya igual que el ingreso original (no es un

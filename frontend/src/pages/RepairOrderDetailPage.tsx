@@ -1503,10 +1503,21 @@ function PartRow({
       `¿Quitar "${part.product.description}" de esta orden? La cantidad (${part.quantity}) vuelve al inventario.`,
     );
     if (!confirmed) return;
+
+    const revenue = Number(part.unitPrice) * part.quantity;
+    // Pregunta aparte (no asumido por defecto): la mayoría de remociones
+    // son correcciones de captura donde nunca se cobró este repuesto —
+    // pero si se cotizó y se aprobó, hay que dejar de cobrarlo también.
+    const adjustTotal = confirm(
+      `¿Este repuesto estaba cotizado y cobrado pero al final no se usó? Acepta para descontar ${formatCurrency(
+        revenue,
+      )} del total de la orden (puede dejar saldo a favor del cliente). Cancela si el cobro se mantiene igual.`,
+    );
+
     setBusy(true);
     setError(null);
     try {
-      await api.delete(`/repair-orders/${orderId}/parts/${part.id}`);
+      await api.delete(`/repair-orders/${orderId}/parts/${part.id}`, { adjustTotal });
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo quitar el repuesto");
@@ -1702,10 +1713,20 @@ function ServiceRow({
   async function handleRemove() {
     const confirmed = confirm(`¿Quitar "${label}" de esta orden?`);
     if (!confirmed) return;
+
+    // Ver el mismo comentario en PartRow.handleRemove — opt-in, no
+    // asumido, porque no todo servicio registrado directo en la orden
+    // pasó por una cotización que ya sumó su precio al total.
+    const adjustTotal = confirm(
+      `¿Este servicio estaba cotizado y cobrado pero al final no se prestó? Acepta para descontar ${formatCurrency(
+        service.price,
+      )} del total de la orden (puede dejar saldo a favor del cliente). Cancela si el cobro se mantiene igual.`,
+    );
+
     setBusy(true);
     setError(null);
     try {
-      await api.delete(`/repair-orders/${orderId}/services/${service.id}`);
+      await api.delete(`/repair-orders/${orderId}/services/${service.id}`, { adjustTotal });
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo quitar el servicio");
@@ -2105,6 +2126,11 @@ function PaymentsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
     }
   }
 
+  // Saldo negativo = el cliente pagó más de lo que la orden termina
+  // cobrando (típicamente tras descontar del total un repuesto/servicio
+  // cotizado que al final no se usó) — hay que devolverle esa diferencia.
+  const overpaid = -Number(order.balance);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -2129,6 +2155,8 @@ function PaymentsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
         </form>
       </Card>
 
+      {overpaid > 0 && <RefundCard orderId={order.id} overpaid={overpaid} onChanged={onChanged} />}
+
       <Card>
         {order.payments.length === 0 ? (
           <EmptyState title="Sin pagos registrados" />
@@ -2148,6 +2176,110 @@ function PaymentsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Devolver el saldo a favor del cliente (ver PaymentsService.refund en el
+ * backend — restringido a Administrador/Gerente, igual que esta tarjeta).
+ * Solo aparece cuando la orden quedó con balance negativo; no se mezcla
+ * con el historial de abonos de arriba porque no es un abono, es dinero
+ * saliendo del taller.
+ */
+function RefundCard({
+  orderId,
+  overpaid,
+  onChanged,
+}: {
+  orderId: number;
+  overpaid: number;
+  onChanged: () => void;
+}) {
+  const { user } = useAuth();
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("CASH");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  if (user?.role !== "Administrador" && user?.role !== "Gerente") {
+    return (
+      <Card>
+        <CardHeader title="Saldo a favor del cliente" />
+        <div className="p-4 text-sm text-ink-muted">
+          Esta orden quedó con {formatCurrency(overpaid)} a favor del cliente. Solo un
+          Administrador o Gerente puede registrar la devolución.
+        </div>
+      </Card>
+    );
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setDone(false);
+    setSaving(true);
+    try {
+      await api.post("/payments/refund", {
+        repairOrderId: orderId,
+        amount: Number(amount),
+        method,
+        notes: notes || undefined,
+      });
+      setAmount("");
+      setNotes("");
+      setDone(true);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo registrar la devolución");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Saldo a favor del cliente"
+        subtitle={`${formatCurrency(overpaid)} pagados de más — registra la devolución`}
+      />
+      <form onSubmit={handleSubmit} className="flex items-end gap-3 p-4">
+        {error && <ErrorBanner message={error} />}
+        {done && (
+          <p className="rounded border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+            Devolución registrada.
+          </p>
+        )}
+        <Field label="Monto a devolver">
+          <Input
+            type="number"
+            min={0.01}
+            max={overpaid}
+            step="0.01"
+            placeholder={String(overpaid)}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Método">
+          <Select value={method} onChange={(e) => setMethod(e.target.value)}>
+            {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Nota (opcional)">
+          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Motivo" />
+        </Field>
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Registrando…" : "Devolver"}
+        </Button>
+      </form>
+    </Card>
   );
 }
 

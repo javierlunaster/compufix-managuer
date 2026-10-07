@@ -110,19 +110,31 @@ export class RepairPartsService {
   }
 
   /**
-   * Quita un repuesto que se agregó por error: revierte el movimiento de
-   * inventario (el stock vuelve, vía un InventoryMovement positivo — nunca
-   * editando Product.stock a mano) y borra el registro de consumo. A
-   * diferencia de la mayoría del sistema, RepairPart no tiene un campo de
-   * estado para "desactivar": es un hecho transaccional (como una medición
-   * de diagnóstico), así que se borra físicamente, con la reversión de
+   * Quita un repuesto de la orden: revierte el movimiento de inventario (el
+   * stock vuelve, vía un InventoryMovement positivo — nunca editando
+   * Product.stock a mano) y borra el registro de consumo. A diferencia de
+   * la mayoría del sistema, RepairPart no tiene un campo de estado para
+   * "desactivar": es un hecho transaccional (como una medición de
+   * diagnóstico), así que se borra físicamente, con la reversión de
    * inventario y el borrado auditados.
+   *
+   * `adjustTotal`: cubre el caso "se cotizó este repuesto, se aprobó la
+   * cotización (que ya sumó su precio a totalValue), pero al final no se
+   * usó" — sin esto, quitarlo de la lista no bastaba para que dejara de
+   * cobrarse: totalValue seguía incluyendo su precio y el saldo pendiente
+   * del cliente quedaba inflado. Opt-in (no el comportamiento por
+   * defecto) porque la mayoría de remociones son correcciones de captura
+   * (se agregó por error, directo, sin pasar por una cotización) donde
+   * totalValue nunca se vio afectado en primer lugar — ver
+   * RepairPartsService.create().
    */
-  async remove(orderId: number, partId: number, actingUserId: number) {
+  async remove(orderId: number, partId: number, actingUserId: number, adjustTotal = false) {
     const part = await this.prisma.repairPart.findUnique({ where: { id: partId } });
     if (!part || part.repairOrderId !== orderId) {
       throw new NotFoundException("Repuesto no encontrado en esta orden");
     }
+
+    const revenue = Number(part.unitPrice) * part.quantity;
 
     await this.prisma.$transaction(async (tx) => {
       await this.movements.applyMovement(tx, {
@@ -135,6 +147,13 @@ export class RepairPartsService {
       });
 
       await tx.repairPart.delete({ where: { id: partId } });
+
+      if (adjustTotal) {
+        await tx.repairOrder.update({
+          where: { id: orderId },
+          data: { totalValue: { decrement: revenue } },
+        });
+      }
     });
 
     await this.audit.log({
@@ -143,9 +162,14 @@ export class RepairPartsService {
       entityType: "RepairPart",
       entityId: partId,
       previousValue: part,
+      newValue: adjustTotal ? { totalValueDecrementedBy: revenue } : undefined,
     });
 
-    return { message: "Repuesto retirado de la orden y stock restituido" };
+    return {
+      message: adjustTotal
+        ? "Repuesto retirado, stock restituido y total de la orden ajustado"
+        : "Repuesto retirado de la orden y stock restituido",
+    };
   }
 
   /**

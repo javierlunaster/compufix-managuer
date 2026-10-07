@@ -100,18 +100,34 @@ export class RepairServicesService {
   }
 
   /**
-   * Quita un servicio aplicado por error. A diferencia de un repuesto, no
-   * hay inventario que reversar — es un borrado físico simple, mismo
-   * criterio que RepairPart (un hecho transaccional sin valor histórico
-   * que preservar si se agregó mal).
+   * Quita un servicio de la orden. A diferencia de un repuesto, no hay
+   * inventario que reversar — es un borrado físico simple, mismo criterio
+   * que RepairPart (un hecho transaccional sin valor histórico que
+   * preservar).
+   *
+   * `adjustTotal`: ver el docstring equivalente en
+   * RepairPartsService.remove() — cubre "se cotizó este servicio, la
+   * cotización se aprobó (sumando su precio a totalValue), pero al final
+   * no se prestó", descontando su precio del total cobrado. Opt-in: la
+   * mayoría de remociones son correcciones de captura donde totalValue
+   * nunca se tocó al crear el registro (ver create()).
    */
-  async remove(orderId: number, repairServiceId: number, actingUserId: number) {
+  async remove(orderId: number, repairServiceId: number, actingUserId: number, adjustTotal = false) {
     const entry = await this.prisma.repairService.findUnique({ where: { id: repairServiceId } });
     if (!entry || entry.repairOrderId !== orderId) {
       throw new NotFoundException("Servicio no encontrado en esta orden");
     }
 
-    await this.prisma.repairService.delete({ where: { id: repairServiceId } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.repairService.delete({ where: { id: repairServiceId } });
+
+      if (adjustTotal) {
+        await tx.repairOrder.update({
+          where: { id: orderId },
+          data: { totalValue: { decrement: entry.price } },
+        });
+      }
+    });
 
     await this.audit.log({
       userId: actingUserId,
@@ -119,8 +135,13 @@ export class RepairServicesService {
       entityType: "RepairService",
       entityId: repairServiceId,
       previousValue: entry,
+      newValue: adjustTotal ? { totalValueDecrementedBy: entry.price } : undefined,
     });
 
-    return { message: "Servicio retirado de la orden" };
+    return {
+      message: adjustTotal
+        ? "Servicio retirado y total de la orden ajustado"
+        : "Servicio retirado de la orden",
+    };
   }
 }

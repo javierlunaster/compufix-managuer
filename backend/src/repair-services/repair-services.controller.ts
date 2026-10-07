@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from "@nestj
 import { RepairServicesService } from "./repair-services.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
 import { CreateRepairServiceDto } from "./dto/create-repair-service.dto";
+import { RemoveRepairServiceDto } from "./dto/remove-repair-service.dto";
 import { CurrentUser, AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 
 @Controller("repair-orders/:orderId/services")
@@ -34,9 +35,10 @@ export class RepairServicesController {
   async remove(
     @Param("orderId", ParseIntPipe) orderId: number,
     @Param("repairServiceId", ParseIntPipe) repairServiceId: number,
+    @Body() dto: RemoveRepairServiceDto,
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
     await this.repairOrdersService.assertTechnicianAccess(actingUser, orderId);
-    return this.repairServicesService.remove(orderId, repairServiceId, actingUser.id);
+    return this.repairServicesService.remove(orderId, repairServiceId, actingUser.id, dto.adjustTotal);
   }
 }

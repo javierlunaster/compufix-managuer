@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { CashService } from "../cash/cash.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
+import { CreateRefundDto } from "./dto/create-refund.dto";
 
 @Injectable()
 export class PaymentsService {
@@ -111,6 +112,65 @@ export class PaymentsService {
     });
 
     return payment;
+  }
+
+  /**
+   * Devuelve dinero a un cliente — el caso típico es una orden que quedó
+   * con saldo a favor del cliente (balance negativo) después de quitar un
+   * repuesto/servicio cotizado y cobrado que al final no se usó (ver
+   * RepairPartsService.remove()/RepairServicesService.remove(),
+   * `adjustTotal`). A diferencia de un abono, NO crea un Payment (ese
+   * historial representa cobros reales, no devoluciones) — decrementa
+   * `paidAmount` directamente y deja un egreso real en Caja ("mejor
+   * esfuerzo": si no hay caja abierta, la devolución igual queda
+   * registrada en la orden, solo que sin reflejo en el arqueo del día).
+   */
+  async refund(dto: CreateRefundDto, actingUserId: number) {
+    const order = await this.prisma.repairOrder.findUnique({
+      where: { id: dto.repairOrderId },
+    });
+    if (!order) {
+      throw new NotFoundException("La orden de reparación indicada no existe");
+    }
+
+    const overpaid = order.paidAmount.minus(order.totalValue);
+    if (overpaid.lessThanOrEqualTo(0)) {
+      throw new BadRequestException(
+        "Esta orden no tiene saldo a favor del cliente — no hay nada que devolver",
+      );
+    }
+    if (new Prisma.Decimal(dto.amount).greaterThan(overpaid)) {
+      throw new BadRequestException(
+        `No puedes devolver más de lo que el cliente pagó de más (${overpaid.toFixed(2)})`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.repairOrder.update({
+        where: { id: dto.repairOrderId },
+        data: { paidAmount: { decrement: dto.amount } },
+      });
+
+      await this.cash.recordRefundExpenseIfRegisterOpen(tx, {
+        category: "Devoluciones",
+        amount: dto.amount,
+        repairOrderId: dto.repairOrderId,
+        userId: actingUserId,
+        description:
+          dto.notes ?? `Devolución (${dto.method}) a cliente — orden ${order.orderCode}`,
+      });
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "REFUND",
+      entityType: "RepairOrder",
+      entityId: dto.repairOrderId,
+      previousValue: { paidAmount: order.paidAmount },
+      newValue: { refundAmount: dto.amount, method: dto.method, notes: dto.notes },
+    });
+
+    return { message: "Devolución registrada" };
   }
 
   findAll(params: { customerId?: number; repairOrderId?: number; saleId?: number }) {
