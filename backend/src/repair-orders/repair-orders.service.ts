@@ -15,6 +15,7 @@ import { UpdateRepairOrderDto } from "./dto/update-repair-order.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
 import { AssignTechnicianDto } from "./dto/assign-technician.dto";
 import { AddProcedureDto } from "./dto/add-procedure.dto";
+import { AdjustOrderTotalDto } from "./dto/adjust-order-total.dto";
 import { MailService } from "../mail/mail.service";
 import { StorageService } from "../storage/storage.service";
 import { formatCurrency } from "../common/utils/format.util";
@@ -620,6 +621,47 @@ export class RepairOrdersService {
       entityId: id,
       previousValue: { totalValue: order.totalValue },
       newValue: { totalValue: recalculatedTotal },
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Descuenta `amount` de totalValue con un motivo obligatorio — para
+   * cuando el total cobrado incluye algo que no tiene (o ya no tiene) una
+   * fila propia de RepairPart/RepairService que quitar con su propio
+   * `adjustTotal` (ver RepairPartsService.remove()/RepairServicesService.
+   * remove()). El caso típico: una cotización convertida ANTES de que se
+   * corrigiera el bug que no creaba RepairService para ítems tipo
+   * LABOR/OTHER (ver QuotationsService.convert) — su precio quedó sumado
+   * al total sin ningún registro que lo represente en la orden, así que
+   * no hay nada que "quitar", solo el total a corregir a mano. Mismo
+   * criterio de restricción que recalculateTotal: toca un total
+   * financiero directamente, sin el respaldo habitual de una cotización o
+   * un repuesto/servicio real.
+   */
+  async adjustTotal(id: number, dto: AdjustOrderTotalDto, actingUserId: number) {
+    const order = await this.ensureExists(id);
+
+    const newTotal = order.totalValue.minus(dto.amount);
+    if (newTotal.lessThan(0)) {
+      throw new BadRequestException(
+        "Ese descuento dejaría el total de la orden en negativo",
+      );
+    }
+
+    await this.prisma.repairOrder.update({
+      where: { id },
+      data: { totalValue: newTotal },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "ADJUST_TOTAL",
+      entityType: "RepairOrder",
+      entityId: id,
+      previousValue: { totalValue: order.totalValue },
+      newValue: { totalValue: newTotal, discountedAmount: dto.amount, reason: dto.reason },
     });
 
     return this.findOne(id);

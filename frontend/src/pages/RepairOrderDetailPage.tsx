@@ -2043,6 +2043,8 @@ function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChang
         </Card>
       )}
 
+      <AdjustTotalCard orderId={order.id} totalValue={order.totalValue} onChanged={onChanged} />
+
       {error && <ErrorBanner message={error} />}
 
       {order.quotations.length === 0 ? (
@@ -2095,6 +2097,106 @@ function QuotationsTab({ order, onChanged }: { order: RepairOrderDetail; onChang
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Descuento manual del total, con motivo obligatorio — para cuando no hay
+ * una fila de repuesto/servicio que quitar (ver el docstring de
+ * RepairOrdersService.adjustTotal en el backend): el caso típico es una
+ * cotización convertida antes de que existiera el registro de
+ * RepairService para ítems de mano de obra, cuyo precio quedó sumado al
+ * total sin ningún rastro propio en la orden. Solo Administrador/Gerente,
+ * igual que "Recalcular total" arriba.
+ */
+function AdjustTotalCard({
+  orderId,
+  totalValue,
+  onChanged,
+}: {
+  orderId: number;
+  totalValue: string;
+  onChanged: () => void;
+}) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (user?.role !== "Administrador" && user?.role !== "Gerente") {
+    return null;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await api.post(`/repair-orders/${orderId}/adjust-total`, {
+        amount: Number(amount),
+        reason,
+      });
+      setAmount("");
+      setReason("");
+      setOpen(false);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo ajustar el total");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs text-ink-muted hover:text-accent hover:underline"
+        >
+          Descontar algo del total sin pasar por un repuesto o servicio…
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Descontar del total de la orden"
+        subtitle={`Total actual: ${formatCurrency(totalValue)}`}
+      />
+      <form onSubmit={handleSubmit} className="flex items-end gap-3 p-4">
+        {error && <ErrorBanner message={error} />}
+        <Field label="Monto a descontar">
+          <Input
+            type="number"
+            min={0.01}
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Motivo">
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Ej. ventilador cotizado pero no usado"
+            required
+          />
+        </Field>
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Guardando…" : "Descontar"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          Cancelar
+        </Button>
+      </form>
+    </Card>
   );
 }
 

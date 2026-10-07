@@ -19,6 +19,7 @@ import { UpdateRepairOrderDto } from "./dto/update-repair-order.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
 import { AssignTechnicianDto } from "./dto/assign-technician.dto";
 import { AddProcedureDto } from "./dto/add-procedure.dto";
+import { AdjustOrderTotalDto } from "./dto/adjust-order-total.dto";
 import { photoUploadOptions } from "../attachments/multer.config";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser, AuthenticatedUser } from "../auth/decorators/current-user.decorator";
@@ -185,5 +186,20 @@ export class RepairOrdersController {
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
     return this.repairOrdersService.recalculateTotal(id, actingUser.id);
+  }
+
+  // Descuento manual del total con motivo — ver el docstring de
+  // adjustTotal: para cuando no hay una fila de repuesto/servicio que
+  // quitar (ej. cotizaciones convertidas antes de que existiera esa
+  // fila para ítems de mano de obra). Mismo criterio de restricción que
+  // recalculate-total.
+  @Post(":id/adjust-total")
+  @Roles("Administrador", "Gerente")
+  adjustTotal(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() dto: AdjustOrderTotalDto,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.repairOrdersService.adjustTotal(id, dto, actingUser.id);
   }
 }
