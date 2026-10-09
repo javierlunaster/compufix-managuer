@@ -30,6 +30,8 @@ import { CashPage } from "@/pages/CashPage";
 import { CashRegisterDetailPage } from "@/pages/CashRegisterDetailPage";
 import { SalesPage } from "@/pages/SalesPage";
 import { PurchasesPage } from "@/pages/PurchasesPage";
+import { ServiceJobsPage } from "@/pages/ServiceJobsPage";
+import { ServiceJobDetailPage } from "@/pages/ServiceJobDetailPage";
 import { PurchaseDetailPage } from "@/pages/PurchaseDetailPage";
 import { SuppliersPage } from "@/pages/SuppliersPage";
 import { SupplierDetailPage } from "@/pages/SupplierDetailPage";
@@ -147,6 +149,8 @@ function AppRoutes() {
       <Route path="/cash/:id" element={<ProtectedLayout><CashRegisterDetailPage /></ProtectedLayout>} />
       <Route path="/sales" element={<ProtectedLayout><SalesPage /></ProtectedLayout>} />
       <Route path="/purchases" element={<ProtectedLayout><PurchasesPage /></ProtectedLayout>} />
+      <Route path="/service-jobs" element={<ProtectedLayout><ServiceJobsPage /></ProtectedLayout>} />
+      <Route path="/service-jobs/:id" element={<ProtectedLayout><ServiceJobDetailPage /></ProtectedLayout>} />
       <Route path="/purchases/:id" element={<ProtectedLayout><PurchaseDetailPage /></ProtectedLayout>} />
       <Route path="/suppliers" element={<ProtectedLayout><SuppliersPage /></ProtectedLayout>} />
       <Route path="/suppliers/:id" element={<ProtectedLayout><SupplierDetailPage /></ProtectedLayout>} />

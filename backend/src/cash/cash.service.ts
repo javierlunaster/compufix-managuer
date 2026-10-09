@@ -280,6 +280,62 @@ export class CashService {
   }
 
   /**
+   * Ingreso automático al registrar un trabajo de Servicios externos (ver
+   * ServiceJobsService.create) — la parte que se queda el taller
+   * (chargedAmount - amountToPayTechnician), igual que una Venta: se
+   * asume cobrado de una vez, no hay seguimiento de abonos parciales.
+   */
+  async recordServiceJobIncomeIfRegisterOpen(
+    tx: PrismaTxClient,
+    params: { category: string; amount: number; serviceJobId: number; userId: number; description?: string },
+  ) {
+    const current = await tx.cashRegister.findFirst({ where: { status: "OPEN" } });
+    if (!current) {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: current.id,
+        type: CashMovementType.INCOME,
+        category: params.category,
+        amount: params.amount,
+        serviceJobId: params.serviceJobId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
+
+  /**
+   * Egreso real al pagarle al técnico su parte de un trabajo externo (ver
+   * ServiceJobsService.markTechnicianPaid) — dinero saliendo de caja de
+   * verdad, por eso cuenta en Finanzas igual que cualquier otro egreso
+   * manual (no es el espejo de nada que ya se haya contado aparte).
+   */
+  async recordTechnicianPaymentExpenseIfRegisterOpen(
+    tx: PrismaTxClient,
+    params: { category: string; amount: number; serviceJobId: number; userId: number; description?: string },
+  ) {
+    const current = await tx.cashRegister.findFirst({ where: { status: "OPEN" } });
+    if (!current) {
+      return null;
+    }
+
+    return tx.cashMovement.create({
+      data: {
+        cashRegisterId: current.id,
+        type: CashMovementType.EXPENSE,
+        category: params.category,
+        amount: params.amount,
+        serviceJobId: params.serviceJobId,
+        description: params.description,
+        userId: params.userId,
+      },
+    });
+  }
+
+  /**
    * Reversa el ingreso de una venta cancelada (ver SalesService.cancel) —
    * un egreso por el mismo monto, marcado con el mismo `saleId` para que
    * FinanceService lo excluya igual que el ingreso original (no es un

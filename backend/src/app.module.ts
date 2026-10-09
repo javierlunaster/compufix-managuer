@@ -11,6 +11,7 @@ import { UsersModule } from "./users/users.module";
 import { RolesModule } from "./roles/roles.module";
 import { CatalogsModule } from "./catalogs/catalogs.module";
 import { BusinessSettingsModule } from "./business-settings/business-settings.module";
+import { ServiceJobsModule } from "./service-jobs/service-jobs.module";
 import { CustomersModule } from "./customers/customers.module";
 import { DevicesModule } from "./devices/devices.module";
 import { RepairOrdersModule } from "./repair-orders/repair-orders.module";
@@ -57,6 +58,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     RolesModule,
     CatalogsModule,
     BusinessSettingsModule,
+    ServiceJobsModule,
     CustomersModule,
     DevicesModule,
     RepairOrdersModule,

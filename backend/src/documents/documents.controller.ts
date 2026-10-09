@@ -93,4 +93,20 @@ export class DocumentsController {
       disposition: asAttachment(filename),
     });
   }
+
+  @Get("service-jobs/:serviceJobId/document")
+  @Header("Content-Type", "application/pdf")
+  async serviceJobAccount(
+    @Param("serviceJobId", ParseIntPipe) serviceJobId: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    const { buffer, filename } = await this.documentsService.generateServiceJobAccount(
+      serviceJobId,
+      actingUser.id,
+    );
+    return new StreamableFile(buffer, {
+      type: "application/pdf",
+      disposition: asAttachment(filename),
+    });
+  }
 }

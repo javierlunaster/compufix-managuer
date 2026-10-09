@@ -7,6 +7,20 @@ import { BusinessSettingsService } from "../business-settings/business-settings.
 import { PdfBuilder } from "../common/pdf/pdf-builder.util";
 import { formatCurrency, formatDate, formatDateTime } from "../common/utils/format.util";
 import { REPAIR_STATUS_LABELS } from "../common/utils/repair-status-labels.util";
+import { numberToWordsEs } from "../common/utils/number-to-words.util";
+
+const MONTHS_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+// "julio 22 del 2026" — el formato exacto que ya usaba el taller en sus
+// cuentas de cobro en papel, distinto del "22 de julio de 2026" que usa
+// formatDate() en el resto de los documentos.
+function formatDateLongEs(value: string | Date): string {
+  const d = new Date(value);
+  return `${MONTHS_ES[d.getMonth()]} ${d.getDate()} del ${d.getFullYear()}`;
+}
 
 const HARDWARE_TEST_CATEGORY_LABELS: Record<HardwareTestCategory, string> = {
   KEYBOARD: "Teclado",
@@ -533,5 +547,124 @@ export class DocumentsService {
     });
 
     return { buffer, filename: `cotizacion-${quotation.quotationNumber}.pdf` };
+  }
+
+  /**
+   * "Cuenta de cobro" de un Servicio externo (ver ServiceJobsService) —
+   * reproduce el formato en papel que ya usaba el taller: carta formal del
+   * técnico (quien presta el servicio y cobra) dirigida al cliente, con el
+   * monto en letras y una tabla de los equipos atendidos. A propósito NO
+   * incluye el reparto 40/60 con el taller — eso es contabilidad interna,
+   * nunca debe aparecer en el documento que recibe el cliente.
+   */
+  async generateServiceJobAccount(serviceJobId: number, actingUserId: number) {
+    const serviceJob = await this.prisma.serviceJob.findUnique({
+      where: { id: serviceJobId },
+      include: {
+        customer: true,
+        technician: true,
+        items: { orderBy: { id: "asc" } },
+      },
+    });
+    if (!serviceJob) {
+      throw new NotFoundException("Servicio externo no encontrado");
+    }
+    const branding = await this.businessSettings.getBrandingForDocuments();
+
+    const pdf = new PdfBuilder();
+    const centerWidth = pdf.doc.page.width - 100;
+
+    pdf.doc.moveDown(2);
+    pdf.doc
+      .fontSize(11)
+      .font("Helvetica")
+      .fillColor("#111827")
+      .text(`Cartagena, ${formatDateLongEs(serviceJob.date)}`, 50, pdf.doc.y, {
+        width: centerWidth,
+        align: "center",
+      });
+
+    pdf.doc.moveDown(1);
+    pdf.doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .text(`Cuenta de Cobro N° ${String(serviceJob.accountNumber).padStart(4, "0")}`, {
+        width: centerWidth,
+        align: "center",
+      });
+
+    pdf.doc.moveDown(1.5);
+    pdf.doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text(`${serviceJob.customer.fullName}.`, { width: centerWidth, align: "center" });
+
+    pdf.doc.moveDown(0.5);
+    pdf.doc.text("DEBE A:", { width: centerWidth, align: "center" });
+
+    pdf.doc.moveDown(1);
+    pdf.doc.text(serviceJob.technician.fullName.toUpperCase(), {
+      width: centerWidth,
+      align: "center",
+    });
+    if (serviceJob.technician.documentId) {
+      pdf.doc
+        .font("Helvetica")
+        .fontSize(10)
+        .text(`C.C. No. ${serviceJob.technician.documentId}`, {
+          width: centerWidth,
+          align: "center",
+        });
+    }
+
+    pdf.doc.moveDown(1.2);
+    const amountWords = numberToWordsEs(Number(serviceJob.chargedAmount));
+    pdf.doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text(amountWords, { width: centerWidth, align: "center" });
+    pdf.doc.text(`(${formatCurrency(serviceJob.chargedAmount)})`, {
+      width: centerWidth,
+      align: "center",
+    });
+
+    pdf.doc.moveDown(1.5);
+    pdf.doc.font("Helvetica").fontSize(10).text(`Por ${serviceJob.description}:`, 50, pdf.doc.y, {
+      width: centerWidth,
+      align: "left",
+    });
+    pdf.doc.x = 50;
+
+    pdf.spacer(10);
+    const rows = serviceJob.items.map((item) => [
+      item.brand,
+      item.code ?? "—",
+      item.observation,
+      formatCurrency(item.value),
+    ]);
+    rows.push(["", "", "", formatCurrency(serviceJob.chargedAmount)]);
+    pdf.table(["Marca", "Código de ingreso", "Observación", "Valor"], rows, [70, 100, 240, 90]);
+
+    pdf.spacer(20);
+    pdf.doc.font("Helvetica").fontSize(10).text("Atentamente.", 50, pdf.doc.y);
+    pdf.signatureLine(serviceJob.technician.fullName.toUpperCase());
+
+    pdf.footer(
+      `${branding.businessName} · Cuenta de cobro N° ${String(serviceJob.accountNumber).padStart(4, "0")}`,
+    );
+
+    const buffer = await pdf.build();
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "GENERATE_SERVICE_JOB_PDF",
+      entityType: "ServiceJob",
+      entityId: serviceJobId,
+    });
+
+    return {
+      buffer,
+      filename: `cuenta-cobro-${String(serviceJob.accountNumber).padStart(4, "0")}.pdf`,
+    };
   }
 }

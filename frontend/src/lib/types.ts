@@ -520,6 +520,38 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PAID: "Pagada",
 };
 
+// Servicios externos (ver ServiceJobsService en el backend) — trabajos en
+// sitio con un técnico, facturados como "cuenta de cobro", con el pago
+// repartido entre el taller y el técnico.
+export type ServiceJobItem = {
+  id: number;
+  brand: string;
+  code?: string | null;
+  observation: string;
+  value: string;
+};
+
+export type ServiceJobListItem = {
+  id: number;
+  accountNumber: number;
+  date: string;
+  description: string;
+  chargedAmount: string;
+  retentionAmount: string;
+  amountToPayTechnician: string;
+  paymentStatus: "PENDING" | "PARTIAL" | "PAID";
+  customer: { id: number; fullName: string };
+  technician: { id: number; fullName: string };
+  items: { id: number }[];
+};
+
+export type ServiceJobDetail = Omit<ServiceJobListItem, "customer" | "technician" | "items"> & {
+  notes?: string | null;
+  customer: { id: number; fullName: string; phone?: string | null; documentId?: string | null };
+  technician: { id: number; fullName: string; documentId?: string | null };
+  items: ServiceJobItem[];
+};
+
 export type CashMovementEntry = {
   id: number;
   type: "INCOME" | "EXPENSE";

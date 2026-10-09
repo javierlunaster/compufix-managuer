@@ -78,6 +78,13 @@ model BusinessSettings {
   accentColor       String @default("#c2884d")
   accentStrongColor String @default("#e3a868")
 
+  // Próximo "Cuenta de Cobro N°" a asignar en Servicios externos (ver
+  // ServiceJobsService.create) — editable aquí para que el taller pueda
+  // continuar la numeración en papel que ya traía (ej. ponerlo en 137 si
+  // la última cuenta de cobro en papel fue la 0136), en vez de reiniciar
+  // en 1 al migrar a este sistema.
+  nextServiceJobAccountNumber Int @default(1)
+
   updatedAt DateTime @updatedAt
 
   @@map("business_settings")
@@ -514,23 +521,64 @@ model Service {
 
 // Mapea la hoja "Servicios": trabajos B2B con comisión de técnico. Distinto
 // del flujo normal de reparación porque paga comisión, no usa repair_orders.
+// Un "trabajo" puede cubrir varios equipos en una sola visita a un cliente
+// (ver ServiceJobItem) — exactamente como la "cuenta de cobro" en papel que
+// ya usaba el taller antes de este sistema, con una fila por equipo.
 model ServiceJob {
-  id                    Int           @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
+  // "Cuenta de Cobro N°" — consecutivo propio del taller (no el id de la
+  // fila), para poder seguir la numeración que ya traían en papel. Se
+  // asigna leyendo/incrementando BusinessSettings.nextServiceJobAccountNumber
+  // en la misma transacción que crea el registro (ver ServiceJobsService).
+  accountNumber Int   @unique
   date                  DateTime
   customerId            Int
   customer              Customer      @relation(fields: [customerId], references: [id])
   description           String
   technicianId          Int
   technician            User          @relation("TechnicianOnJob", fields: [technicianId], references: [id])
+  // Suma de ServiceJobItem.value al momento de crear el registro — igual
+  // que RepairOrder.totalValue, es un snapshot que mantiene el servicio,
+  // no un valor calculado al vuelo desde los ítems.
   chargedAmount         Decimal       @db.Decimal(12, 2)
   // Confirmado: el % de comisión se ajusta manualmente por servicio, no es
-  // una regla fija del negocio — por eso se captura el monto, no un %.
+  // una regla fija del negocio — por eso se captura el monto, no un %
+  // (el % solo se usa en el formulario del frontend para calcular estos
+  // dos montos al crear el registro).
   retentionAmount       Decimal       @db.Decimal(12, 2)
   amountToPayTechnician Decimal       @db.Decimal(12, 2)
+  // Si ya se le pagó al técnico su parte (ver
+  // ServiceJobsService.markTechnicianPaid) — NO es si el cliente pagó el
+  // servicio (eso se asume cobrado de una vez, igual que una Venta).
   paymentStatus         PaymentStatus @default(PENDING)
   notes                 String?
+  // Para anular una cuenta de cobro sin borrar el historial (igual que el
+  // resto del sistema) — nunca se reutiliza su accountNumber.
+  status                RecordStatus  @default(ACTIVE)
+  createdAt              DateTime     @default(now())
+
+  items         ServiceJobItem[]
+  cashMovements CashMovement[]
 
   @@map("service_jobs")
+}
+
+// Una fila de la tabla "Marca | Código de ingreso | Observación | Valor" de
+// la cuenta de cobro — deliberadamente SIN relación a RepairOrder: estos
+// equipos se atienden en sitio, fuera del flujo normal del taller, así que
+// no tienen (ni necesitan) una orden de reparación propia en el sistema.
+model ServiceJobItem {
+  id           Int        @id @default(autoincrement())
+  serviceJobId Int
+  serviceJob   ServiceJob @relation(fields: [serviceJobId], references: [id], onDelete: Cascade)
+  brand        String
+  // "Código de ingreso" en el papel — texto libre (ej. un consecutivo
+  // interno del cliente, o vacío), no un FK a ninguna otra tabla.
+  code         String?
+  observation  String
+  value        Decimal    @db.Decimal(12, 2)
+
+  @@map("service_job_items")
 }
 
 // -----------------------------------------------------------------------------
@@ -1018,6 +1066,12 @@ model CashMovement {
   // aplican a ninguna reparación puntual.
   repairOrderId  Int?
   repairOrder    RepairOrder?     @relation(fields: [repairOrderId], references: [id])
+  // Trabajo externo (ver ServiceJob) que generó este movimiento: el ingreso
+  // de la parte del taller al registrarlo, o el egreso al pagarle su parte
+  // al técnico (ver ServiceJobsService). Mismo criterio que repairOrderId:
+  // metadata sobre un movimiento real, FinanceService no lo excluye.
+  serviceJobId   Int?
+  serviceJob     ServiceJob?      @relation(fields: [serviceJobId], references: [id])
   description    String?
   date           DateTime         @default(now())
   userId         Int

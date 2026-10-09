@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/inventory", label: "Inventario", icon: BoxIcon },
   { to: "/sales", label: "Ventas", icon: CartIcon },
   { to: "/purchases", label: "Compras", icon: TruckIcon },
+  { to: "/service-jobs", label: "Servicios externos", icon: BriefcaseIcon },
   { to: "/cash", label: "Caja", icon: CashIcon },
   { to: "/finance", label: "Finanzas", icon: ChartIcon, roles: ["Administrador", "Gerente"] },
   // El backend restringe toda la gestión de usuarios a Administrador
@@ -267,6 +268,16 @@ function TruckIcon({ className }: { className?: string }) {
       <path d="M14 10h4l3 3v3h-7z" />
       <circle cx="6" cy="18" r="1.5" />
       <circle cx="16.5" cy="18" r="1.5" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M3 12h18" />
     </svg>
   );
 }
