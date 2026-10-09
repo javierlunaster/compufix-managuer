@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -48,5 +49,21 @@ export class BusinessSettingsController {
     @CurrentUser() actingUser: AuthenticatedUser,
   ) {
     return this.businessSettingsService.updateLogo(file, actingUser.id);
+  }
+
+  @Post("owner-signature")
+  @Roles("Administrador")
+  @UseInterceptors(FileInterceptor("file", photoUploadOptions))
+  updateOwnerSignature(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.businessSettingsService.updateOwnerSignature(file, actingUser.id);
+  }
+
+  @Delete("owner-signature")
+  @Roles("Administrador")
+  clearOwnerSignature(@CurrentUser() actingUser: AuthenticatedUser) {
+    return this.businessSettingsService.clearOwnerSignature(actingUser.id);
   }
 }

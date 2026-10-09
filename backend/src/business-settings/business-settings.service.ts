@@ -81,6 +81,48 @@ export class BusinessSettingsService {
     return updated;
   }
 
+  /**
+   * Reemplaza la firma del propietario — mismo criterio que updateLogo():
+   * sube primero, el archivo anterior queda huérfano a propósito.
+   */
+  async updateOwnerSignature(file: Express.Multer.File, actingUserId: number) {
+    await this.getOrCreate();
+    const uploaded = await this.storage.upload(file, "business-settings/owner-signature");
+
+    const updated = await this.prisma.businessSettings.update({
+      where: { id: SETTINGS_ID },
+      data: { ownerSignatureUrl: uploaded.publicUrl },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "UPDATE_OWNER_SIGNATURE",
+      entityType: "BusinessSettings",
+      entityId: SETTINGS_ID,
+      newValue: { ownerSignatureUrl: uploaded.publicUrl },
+    });
+
+    return updated;
+  }
+
+  async clearOwnerSignature(actingUserId: number) {
+    const before = await this.getOrCreate();
+    const updated = await this.prisma.businessSettings.update({
+      where: { id: SETTINGS_ID },
+      data: { ownerSignatureUrl: null },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "CLEAR_OWNER_SIGNATURE",
+      entityType: "BusinessSettings",
+      entityId: SETTINGS_ID,
+      previousValue: { ownerSignatureUrl: before.ownerSignatureUrl },
+    });
+
+    return updated;
+  }
+
   /** Para PDFs/correos (ver PdfBuilder, mail/templates.ts) — solo lo que necesitan, sin pasar el objeto completo. */
   async getBrandingForDocuments() {
     const settings = await this.getOrCreate();
@@ -93,6 +135,7 @@ export class BusinessSettingsService {
       // respaldo.
       ownerFullName: settings.ownerFullName,
       ownerDocumentId: settings.ownerDocumentId,
+      ownerSignatureUrl: settings.ownerSignatureUrl,
     };
   }
 }

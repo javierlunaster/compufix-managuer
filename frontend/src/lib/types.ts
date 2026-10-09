@@ -31,6 +31,7 @@ export type SystemUser = {
   specialty?: string | null;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
+  signatureUrl?: string | null;
 };
 
 export type AuthUser = {
@@ -736,6 +737,7 @@ export type BusinessSettings = {
   nextServiceJobAccountNumber: number;
   ownerFullName?: string | null;
   ownerDocumentId?: string | null;
+  ownerSignatureUrl?: string | null;
   updatedAt: string;
 };
 

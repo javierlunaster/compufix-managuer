@@ -96,6 +96,12 @@ model BusinessSettings {
   ownerFullName   String?
   ownerDocumentId String?
 
+  // Imagen de la firma del propietario (ver DocumentsService.signatureImage)
+  // — reemplaza la línea en blanco de la cuenta de cobro por la firma real
+  // cuando ya se subió. Si no se subió, el documento cae de vuelta a la
+  // línea en blanco (nunca bloquea el PDF por esto).
+  ownerSignatureUrl String?
+
   updatedAt DateTime @updatedAt
 
   @@map("business_settings")
@@ -147,6 +153,13 @@ model User {
   specialty    String? // solo aplica a técnicos, texto libre por ahora
   status       RecordStatus @default(ACTIVE)
   createdAt    DateTime     @default(now())
+
+  // Imagen de la firma de este usuario (ver DocumentsService.signatureImage)
+  // — usada en documentos donde firma como técnico responsable (informe
+  // técnico) o, si es el propietario del negocio, como respaldo de
+  // BusinessSettings.ownerSignatureUrl cuando esa todavía no se configuró
+  // (ver DocumentsService.generateServiceJobAccount).
+  signatureUrl String?
 
   // relaciones donde este usuario participa
   assignedOrders         RepairOrder[]         @relation("AssignedTechnician")

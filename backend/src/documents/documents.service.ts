@@ -217,7 +217,12 @@ export class DocumentsService {
       ["Estado final", REPAIR_STATUS_LABELS[order.status]],
       ["Fecha del informe", formatDate(new Date())],
     ]);
-    pdf.signatureLine("Firma del técnico responsable");
+    if (order.technician?.signatureUrl) {
+      const technicianSignature = await this.fetchPhotoBuffer(order.technician.signatureUrl);
+      pdf.signatureImage(technicianSignature, "Firma del técnico responsable");
+    } else {
+      pdf.signatureLine("Firma del técnico responsable");
+    }
 
     pdf.footer(`${branding.businessName} · Informe técnico · Orden ${order.orderCode}`);
 
@@ -579,6 +584,9 @@ export class DocumentsService {
     const billerDocumentId = branding.ownerFullName
       ? branding.ownerDocumentId
       : serviceJob.technician.documentId;
+    const billerSignatureUrl = branding.ownerFullName
+      ? branding.ownerSignatureUrl
+      : serviceJob.technician.signatureUrl;
 
     const pdf = new PdfBuilder();
     const centerWidth = pdf.doc.page.width - 100;
@@ -656,7 +664,12 @@ export class DocumentsService {
 
     pdf.spacer(20);
     pdf.doc.font("Helvetica").fontSize(10).text("Atentamente.", 50, pdf.doc.y);
-    pdf.signatureLine(billerName.toUpperCase());
+    if (billerSignatureUrl) {
+      const billerSignature = await this.fetchPhotoBuffer(billerSignatureUrl);
+      pdf.signatureImage(billerSignature, billerName.toUpperCase());
+    } else {
+      pdf.signatureLine(billerName.toUpperCase());
+    }
 
     pdf.footer(
       `${branding.businessName} · Cuenta de cobro N° ${String(serviceJob.accountNumber).padStart(4, "0")}`,

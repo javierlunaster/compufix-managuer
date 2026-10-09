@@ -6,6 +6,7 @@ import {
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { StorageService } from "../storage/storage.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -23,6 +24,7 @@ const SAFE_SELECT = {
   specialty: true,
   status: true,
   createdAt: true,
+  signatureUrl: true,
 } as const;
 
 @Injectable()
@@ -30,6 +32,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private storage: StorageService,
   ) {}
 
   async create(dto: CreateUserDto, actingUserId: number) {
@@ -169,6 +172,52 @@ export class UsersService {
       entityId: id,
       previousValue: { status: before.status },
       newValue: { status: user.status },
+    });
+
+    return user;
+  }
+
+  /**
+   * Firma de este usuario para documentos donde firma como técnico
+   * responsable (ver DocumentsService.generateTechnicalReport) — mismo
+   * criterio que BusinessSettingsService.updateLogo: sube primero, el
+   * archivo anterior queda huérfano a propósito.
+   */
+  async updateSignature(id: number, file: Express.Multer.File, actingUserId: number) {
+    await this.findOne(id); // 404 si no existe
+
+    const uploaded = await this.storage.upload(file, `users/${id}/signature`);
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { signatureUrl: uploaded.publicUrl },
+      select: SAFE_SELECT,
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "UPDATE_SIGNATURE",
+      entityType: "User",
+      entityId: id,
+      newValue: { signatureUrl: uploaded.publicUrl },
+    });
+
+    return user;
+  }
+
+  async clearSignature(id: number, actingUserId: number) {
+    await this.findOne(id); // 404 si no existe
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { signatureUrl: null },
+      select: SAFE_SELECT,
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "CLEAR_SIGNATURE",
+      entityType: "User",
+      entityId: id,
     });
 
     return user;

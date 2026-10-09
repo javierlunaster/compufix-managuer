@@ -53,6 +53,7 @@ export function SettingsPage() {
       {settings && <LogoCard settings={settings} onUpdated={setSettings} />}
       {settings && <ThemeCard settings={settings} onUpdated={setSettings} />}
       {settings && <ServiceJobAccountCard settings={settings} onUpdated={setSettings} />}
+      {settings && <OwnerSignatureCard settings={settings} onUpdated={setSettings} />}
       {settings && <BrandingForm settings={settings} onUpdated={setSettings} />}
     </div>
   );
@@ -197,15 +198,17 @@ type BrandingFields = Omit<
   | "nextServiceJobAccountNumber"
   | "ownerFullName"
   | "ownerDocumentId"
+  | "ownerSignatureUrl"
 >;
 
 // El backend rechaza (ValidationPipe con forbidNonWhitelisted) cualquier
 // campo que no esté declarado en UpdateBusinessSettingsDto — así que el
 // PATCH de este formulario nunca puede mandar el objeto `settings` tal
 // cual (trae id/updatedAt/logoUrl/accentColor/accentStrongColor/
-// nextServiceJobAccountNumber/ownerFullName/ownerDocumentId, que no son
-// parte del DTO o viven en sus propias tarjetas). Se extraen a mano los
-// campos que sí le corresponden a este formulario.
+// nextServiceJobAccountNumber/ownerFullName/ownerDocumentId/
+// ownerSignatureUrl, que no son parte del DTO o viven en sus propias
+// tarjetas). Se extraen a mano los campos que sí le corresponden a este
+// formulario.
 function pickBrandingFields(settings: BusinessSettings): BrandingFields {
   const {
     id,
@@ -216,6 +219,7 @@ function pickBrandingFields(settings: BusinessSettings): BrandingFields {
     nextServiceJobAccountNumber,
     ownerFullName,
     ownerDocumentId,
+    ownerSignatureUrl,
     ...fields
   } = settings;
   return fields;
@@ -310,6 +314,102 @@ function ServiceJobAccountCard({
           {saving ? "Guardando…" : "Guardar"}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+/**
+ * Firma (imagen) del propietario para la cuenta de cobro — reemplaza la
+ * línea en blanco de la firma por la imagen real (ver
+ * DocumentsService.generateServiceJobAccount / PdfBuilder.signatureImage).
+ * Si no se sube, el documento sigue saliendo igual que antes, con la línea
+ * en blanco para firmar a mano.
+ */
+function OwnerSignatureCard({
+  settings,
+  onUpdated,
+}: {
+  settings: BusinessSettings;
+  onUpdated: (s: BusinessSettings) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleUpload() {
+    if (!file) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const updated = await api.postForm<BusinessSettings>(
+        "/business-settings/owner-signature",
+        formData,
+      );
+      onUpdated(updated);
+      setFile(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo subir la firma");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClear() {
+    if (!confirm("¿Quitar la firma del propietario? Las próximas cuentas de cobro saldrán sin ella.")) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const updated = await api.delete<BusinessSettings>("/business-settings/owner-signature");
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo quitar la firma");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Firma del propietario"
+        subtitle="Sale impresa en la cuenta de cobro de Servicios externos, en vez de la línea en blanco"
+      />
+      <div className="flex flex-wrap items-center gap-4 p-4">
+        {settings.ownerSignatureUrl && (
+          <div className="flex items-center rounded bg-white px-3 py-2 shadow-sm">
+            <img
+              src={resolvePhotoUrl(settings.ownerSignatureUrl)}
+              alt="Firma del propietario"
+              className="h-14 w-auto"
+            />
+          </div>
+        )}
+        <div className="flex flex-1 flex-col gap-2">
+          {error && <ErrorBanner message={error} />}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="text-xs text-ink-muted file:mr-2 file:rounded file:border file:border-border file:bg-surface-raised file:px-2 file:py-1 file:text-xs file:text-ink"
+          />
+          <div className="flex gap-2">
+            {file && (
+              <Button type="button" variant="secondary" onClick={handleUpload} disabled={busy}>
+                {busy ? "Subiendo…" : "Subir firma"}
+              </Button>
+            )}
+            {settings.ownerSignatureUrl && !file && (
+              <Button type="button" variant="danger" onClick={handleClear} disabled={busy}>
+                Quitar firma
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }

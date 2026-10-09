@@ -26,7 +26,7 @@ import { formatCurrency } from "../common/utils/format.util";
 const ORDER_DETAIL_INCLUDE = {
   customer: true,
   technician: {
-    select: { id: true, fullName: true, specialty: true },
+    select: { id: true, fullName: true, specialty: true, signatureUrl: true },
   },
   device: { include: { deviceType: true, brand: true } },
   statusHistory: {

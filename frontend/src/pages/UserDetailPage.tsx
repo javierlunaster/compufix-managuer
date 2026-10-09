@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { Role, SystemUser } from "@/lib/types";
 import {
@@ -125,7 +125,88 @@ export function UserDetailPage() {
           </div>
         )}
       </Card>
+
+      <SignatureCard user={user} onUpdated={reload} />
     </div>
+  );
+}
+
+/**
+ * Firma (imagen) de este usuario — sale impresa en documentos donde firma
+ * como técnico responsable (ver DocumentsService.generateTechnicalReport)
+ * o, si es el propietario del negocio y en Configuración todavía no se
+ * subió una firma propia, como respaldo en la cuenta de cobro (ver
+ * DocumentsService.generateServiceJobAccount). Si no se sube, esos
+ * documentos siguen saliendo igual que antes, con la línea en blanco.
+ */
+function SignatureCard({ user, onUpdated }: { user: SystemUser; onUpdated: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleUpload() {
+    if (!file) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api.postForm(`/users/${user.id}/signature`, formData);
+      setFile(null);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo subir la firma");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClear() {
+    if (!confirm("¿Quitar la firma de este usuario?")) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await api.delete(`/users/${user.id}/signature`);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo quitar la firma");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Firma" subtitle="Sale impresa en los documentos donde este usuario firma" />
+      <div className="flex flex-wrap items-center gap-4 p-4">
+        {user.signatureUrl && (
+          <div className="flex items-center rounded bg-white px-3 py-2 shadow-sm">
+            <img src={resolvePhotoUrl(user.signatureUrl)} alt="Firma" className="h-14 w-auto" />
+          </div>
+        )}
+        <div className="flex flex-1 flex-col gap-2">
+          {error && <ErrorBanner message={error} />}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="text-xs text-ink-muted file:mr-2 file:rounded file:border file:border-border file:bg-surface-raised file:px-2 file:py-1 file:text-xs file:text-ink"
+          />
+          <div className="flex gap-2">
+            {file && (
+              <Button type="button" variant="secondary" onClick={handleUpload} disabled={busy}>
+                {busy ? "Subiendo…" : "Subir firma"}
+              </Button>
+            )}
+            {user.signatureUrl && !file && (
+              <Button type="button" variant="danger" onClick={handleClear} disabled={busy}>
+                Quitar firma
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
