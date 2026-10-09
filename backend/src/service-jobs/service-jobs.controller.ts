@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { PaymentStatus } from "@prisma/client";
 import { ServiceJobsService } from "./service-jobs.service";
 import { CreateServiceJobDto } from "./dto/create-service-job.dto";
@@ -35,6 +35,23 @@ export class ServiceJobsController {
   @Get(":id")
   findOne(@Param("id", ParseIntPipe) id: number) {
     return this.serviceJobsService.findOne(id);
+  }
+
+  // Editar/eliminar antes de que el cliente pague: mismo criterio abierto
+  // que crear (ver ServiceJobsService.update/remove) — nada financiero ha
+  // ocurrido todavía mientras clientPaymentStatus siga PENDING.
+  @Patch(":id")
+  update(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() dto: CreateServiceJobDto,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.serviceJobsService.update(id, dto, actingUser.id);
+  }
+
+  @Delete(":id")
+  remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() actingUser: AuthenticatedUser) {
+    return this.serviceJobsService.remove(id, actingUser.id);
   }
 
   // Registra que el cliente pagó la cuenta de cobro — dinero real

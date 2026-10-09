@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/lib/useFetch";
@@ -7,11 +7,15 @@ import type { ServiceJobDetail } from "@/lib/types";
 import { PAYMENT_STATUS_LABELS } from "@/lib/types";
 import { Button, Card, CardHeader, ErrorBanner, Spinner } from "@/components/ui";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
+import { ServiceJobForm } from "@/components/ServiceJobForm";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export function ServiceJobDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const {
     data: job,
     loading,
@@ -33,12 +37,54 @@ export function ServiceJobDetailPage() {
   }
 
   const accountNumber = String(job.accountNumber).padStart(4, "0");
+  // Una vez el cliente paga, ya quedó un ingreso real en Caja ligado a
+  // estos montos (ver ServiceJobsService.markClientPaid) — editar o
+  // eliminar después descuadraría las cuentas, así que ambas acciones se
+  // ocultan a partir de ese momento (ver update/remove en el backend).
+  const canEditOrDelete = job.clientPaymentStatus === "PENDING";
+
+  if (editing) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <h1 className="text-xl font-semibold text-ink">
+          Editar cuenta de cobro N° {accountNumber}
+        </h1>
+        <ServiceJobForm
+          existing={job}
+          onSaved={() => {
+            setEditing(false);
+            reload();
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
+
+  async function handleDelete() {
+    if (
+      !confirm(
+        `¿Eliminar la cuenta de cobro N° ${accountNumber}? Esta acción no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+    setDeleteError(null);
+    try {
+      await api.delete(`/service-jobs/${id}`);
+      navigate("/service-jobs");
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "No se pudo eliminar");
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-4">
       <Link to="/service-jobs" className="text-xs text-ink-muted hover:text-accent">
         ← Volver a Servicios externos
       </Link>
+
+      {deleteError && <ErrorBanner message={deleteError} />}
 
       <Card className="p-5">
         <div className="flex items-start justify-between">
@@ -49,11 +95,23 @@ export function ServiceJobDetailPage() {
               {formatDate(job.date)} · Técnico: {job.technician.fullName}
             </p>
           </div>
-          <DownloadPdfButton
-            path={`/service-jobs/${job.id}/document`}
-            filename={`cuenta-cobro-${accountNumber}.pdf`}
-            label="Descargar PDF"
-          />
+          <div className="flex items-center gap-2">
+            <DownloadPdfButton
+              path={`/service-jobs/${job.id}/document`}
+              filename={`cuenta-cobro-${accountNumber}.pdf`}
+              label="Descargar PDF"
+            />
+            {canEditOrDelete && (
+              <>
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  Editar
+                </Button>
+                <Button variant="danger" onClick={handleDelete}>
+                  Eliminar
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <p className="mt-3 text-sm text-ink">{job.description}</p>

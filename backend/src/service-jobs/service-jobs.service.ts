@@ -143,6 +143,112 @@ export class ServiceJobsService {
   }
 
   /**
+   * Edita un servicio externo antes de enviarlo/cobrarlo — una vez que el
+   * cliente ya pagó, ya existe un movimiento real de Caja ligado a los
+   * montos actuales (ver markClientPaid), así que editar después
+   * descuadraría las cuentas. accountNumber nunca cambia: sigue siendo el
+   * mismo consecutivo de la cuenta de cobro ya asignada.
+   */
+  async update(id: number, dto: CreateServiceJobDto, actingUserId: number) {
+    const existing = await this.findOne(id);
+    if (existing.clientPaymentStatus !== "PENDING") {
+      throw new BadRequestException(
+        "No puedes editar esta cuenta de cobro: el cliente ya la pagó",
+      );
+    }
+
+    const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+    if (!customer) {
+      throw new NotFoundException("El cliente indicado no existe");
+    }
+    const technician = await this.prisma.user.findUnique({ where: { id: dto.technicianId } });
+    if (!technician) {
+      throw new NotFoundException("El técnico indicado no existe");
+    }
+
+    const chargedAmount = dto.items.reduce((sum, item) => sum + item.value, 0);
+    const amountToPayTechnician = Math.round(chargedAmount * (dto.technicianPercentage / 100) * 100) / 100;
+    const retentionAmount = Math.round((chargedAmount - amountToPayTechnician) * 100) / 100;
+
+    const serviceJob = await this.prisma.$transaction(async (tx) => {
+      await tx.serviceJobItem.deleteMany({ where: { serviceJobId: id } });
+      return tx.serviceJob.update({
+        where: { id },
+        data: {
+          date: new Date(dto.date),
+          customerId: dto.customerId,
+          description: dto.description,
+          technicianId: dto.technicianId,
+          chargedAmount,
+          retentionAmount,
+          amountToPayTechnician,
+          notes: dto.notes,
+          items: {
+            create: dto.items.map((item) => ({
+              brand: item.brand,
+              code: item.code,
+              observation: item.observation,
+              value: item.value,
+            })),
+          },
+        },
+        include: DETAIL_INCLUDE,
+      });
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "UPDATE",
+      entityType: "ServiceJob",
+      entityId: id,
+      previousValue: {
+        customerId: existing.customerId,
+        technicianId: existing.technicianId,
+        chargedAmount: existing.chargedAmount,
+        retentionAmount: existing.retentionAmount,
+        amountToPayTechnician: existing.amountToPayTechnician,
+      },
+      newValue: {
+        customerId: dto.customerId,
+        technicianId: dto.technicianId,
+        chargedAmount,
+        retentionAmount,
+        amountToPayTechnician,
+      },
+    });
+
+    return serviceJob;
+  }
+
+  /**
+   * Elimina (borrado lógico) un servicio externo antes de que el cliente
+   * pague — igual criterio que update(): una vez pagado ya quedó
+   * registrado en Caja y no se puede tocar. El accountNumber de una
+   * cuenta de cobro eliminada nunca se reutiliza.
+   */
+  async remove(id: number, actingUserId: number) {
+    const existing = await this.findOne(id);
+    if (existing.clientPaymentStatus !== "PENDING") {
+      throw new BadRequestException(
+        "No puedes eliminar esta cuenta de cobro: el cliente ya la pagó",
+      );
+    }
+
+    await this.prisma.serviceJob.update({ where: { id }, data: { status: "INACTIVE" } });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "DELETE",
+      entityType: "ServiceJob",
+      entityId: id,
+      previousValue: { status: "ACTIVE", accountNumber: existing.accountNumber },
+      newValue: { status: "INACTIVE" },
+    });
+
+    return { success: true };
+  }
+
+  /**
    * Registra que el cliente pagó la cuenta de cobro — el ingreso de caja
    * es por chargedAmount COMPLETO (lo que de verdad entra a caja), no
    * solo la parte del taller: si solo se registrara retentionAmount como
