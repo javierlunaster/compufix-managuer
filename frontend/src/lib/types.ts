@@ -724,6 +724,14 @@ export type BusinessSettings = {
   logoUrl?: string | null;
   accentColor: string;
   accentStrongColor: string;
+  // Servicios externos (ver ServiceJobsService/DocumentsService en el
+  // backend): numeración de la próxima cuenta de cobro, y la identidad
+  // del propietario que SIEMPRE firma ese documento (nunca el técnico que
+  // hizo el trabajo — su nombre de usuario suele ser el genérico
+  // "Administrador", no sirve para un documento formal).
+  nextServiceJobAccountNumber: number;
+  ownerFullName?: string | null;
+  ownerDocumentId?: string | null;
   updatedAt: string;
 };
 

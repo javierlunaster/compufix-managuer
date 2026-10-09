@@ -52,6 +52,7 @@ export function SettingsPage() {
 
       {settings && <LogoCard settings={settings} onUpdated={setSettings} />}
       {settings && <ThemeCard settings={settings} onUpdated={setSettings} />}
+      {settings && <ServiceJobAccountCard settings={settings} onUpdated={setSettings} />}
       {settings && <BrandingForm settings={settings} onUpdated={setSettings} />}
     </div>
   );
@@ -188,18 +189,129 @@ function ThemeCard({
 
 type BrandingFields = Omit<
   BusinessSettings,
-  "id" | "logoUrl" | "accentColor" | "accentStrongColor" | "updatedAt"
+  | "id"
+  | "logoUrl"
+  | "accentColor"
+  | "accentStrongColor"
+  | "updatedAt"
+  | "nextServiceJobAccountNumber"
+  | "ownerFullName"
+  | "ownerDocumentId"
 >;
 
 // El backend rechaza (ValidationPipe con forbidNonWhitelisted) cualquier
 // campo que no esté declarado en UpdateBusinessSettingsDto — así que el
 // PATCH de este formulario nunca puede mandar el objeto `settings` tal
-// cual (trae id/updatedAt/logoUrl/accentColor/accentStrongColor, que no
-// son parte del DTO o viven en sus propias tarjetas/endpoint). Se extraen
-// a mano los campos que sí le corresponden a este formulario.
+// cual (trae id/updatedAt/logoUrl/accentColor/accentStrongColor/
+// nextServiceJobAccountNumber/ownerFullName/ownerDocumentId, que no son
+// parte del DTO o viven en sus propias tarjetas). Se extraen a mano los
+// campos que sí le corresponden a este formulario.
 function pickBrandingFields(settings: BusinessSettings): BrandingFields {
-  const { id, logoUrl, accentColor, accentStrongColor, updatedAt, ...fields } = settings;
+  const {
+    id,
+    logoUrl,
+    accentColor,
+    accentStrongColor,
+    updatedAt,
+    nextServiceJobAccountNumber,
+    ownerFullName,
+    ownerDocumentId,
+    ...fields
+  } = settings;
   return fields;
+}
+
+/**
+ * Identidad que firma la cuenta de cobro de Servicios externos (ver
+ * DocumentsService.generateServiceJobAccount) — SIEMPRE el propietario,
+ * nunca el técnico que hizo el trabajo en sitio. También deja fijar en
+ * qué número sigue la numeración ("Cuenta de Cobro N°"), para continuar
+ * donde se quedó el taller con su numeración en papel.
+ */
+function ServiceJobAccountCard({
+  settings,
+  onUpdated,
+}: {
+  settings: BusinessSettings;
+  onUpdated: (s: BusinessSettings) => void;
+}) {
+  const [ownerFullName, setOwnerFullName] = useState(settings.ownerFullName ?? "");
+  const [ownerDocumentId, setOwnerDocumentId] = useState(settings.ownerDocumentId ?? "");
+  const [nextAccountNumber, setNextAccountNumber] = useState(
+    String(settings.nextServiceJobAccountNumber),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setDone(false);
+    setSaving(true);
+    try {
+      const updated = await api.patch<BusinessSettings>("/business-settings", {
+        ownerFullName: ownerFullName || undefined,
+        ownerDocumentId: ownerDocumentId || undefined,
+        nextServiceJobAccountNumber: Number(nextAccountNumber) || undefined,
+      });
+      onUpdated(updated);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Servicios externos"
+        subtitle="Quién firma la cuenta de cobro, y la numeración de la próxima"
+      />
+      <form onSubmit={handleSubmit} className="space-y-3 p-4">
+        {error && <ErrorBanner message={error} />}
+        {done && (
+          <p className="rounded border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+            Guardado correctamente.
+          </p>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nombre completo del propietario">
+            <Input
+              value={ownerFullName}
+              onChange={(e) => setOwnerFullName(e.target.value)}
+              placeholder="Ej. Javier Enrique Luna Marzola"
+            />
+          </Field>
+          <Field label="Cédula del propietario">
+            <Input
+              value={ownerDocumentId}
+              onChange={(e) => setOwnerDocumentId(e.target.value)}
+              placeholder="Ej. 8363317"
+            />
+          </Field>
+        </div>
+        <p className="text-xs text-ink-muted">
+          La cuenta de cobro siempre sale a nombre del propietario, no del técnico asignado al
+          trabajo — su comisión se calcula aparte.
+        </p>
+        <Field label="Próxima Cuenta de Cobro N°">
+          <Input
+            type="number"
+            min={1}
+            value={nextAccountNumber}
+            onChange={(e) => setNextAccountNumber(e.target.value)}
+            className="max-w-[10rem]"
+          />
+        </Field>
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Guardando…" : "Guardar"}
+        </Button>
+      </form>
+    </Card>
+  );
 }
 
 function BrandingForm({

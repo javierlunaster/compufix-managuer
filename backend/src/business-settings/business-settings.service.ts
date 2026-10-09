@@ -84,6 +84,15 @@ export class BusinessSettingsService {
   /** Para PDFs/correos (ver PdfBuilder, mail/templates.ts) — solo lo que necesitan, sin pasar el objeto completo. */
   async getBrandingForDocuments() {
     const settings = await this.getOrCreate();
-    return { businessName: settings.businessName, tagline: settings.tagline };
+    return {
+      businessName: settings.businessName,
+      tagline: settings.tagline,
+      // Para la cuenta de cobro de Servicios externos — ver
+      // DocumentsService.generateServiceJobAccount. Puede venir vacío si
+      // todavía no se configuró en Configuración; ese método decide el
+      // respaldo.
+      ownerFullName: settings.ownerFullName,
+      ownerDocumentId: settings.ownerDocumentId,
+    };
   }
 }

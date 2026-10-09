@@ -570,6 +570,15 @@ export class DocumentsService {
       throw new NotFoundException("Servicio externo no encontrado");
     }
     const branding = await this.businessSettings.getBrandingForDocuments();
+    // La cuenta de cobro SIEMPRE la factura el propietario del negocio,
+    // nunca el técnico que hizo el trabajo en sitio (su comisión se
+    // calcula aparte — ver ServiceJobsService). Si todavía no se
+    // configuró en Configuración, se cae al técnico asignado para no
+    // dejar el documento sin firmante.
+    const billerName = branding.ownerFullName || serviceJob.technician.fullName;
+    const billerDocumentId = branding.ownerFullName
+      ? branding.ownerDocumentId
+      : serviceJob.technician.documentId;
 
     const pdf = new PdfBuilder();
     const centerWidth = pdf.doc.page.width - 100;
@@ -603,15 +612,15 @@ export class DocumentsService {
     pdf.doc.text("DEBE A:", { width: centerWidth, align: "center" });
 
     pdf.doc.moveDown(1);
-    pdf.doc.text(serviceJob.technician.fullName.toUpperCase(), {
+    pdf.doc.text(billerName.toUpperCase(), {
       width: centerWidth,
       align: "center",
     });
-    if (serviceJob.technician.documentId) {
+    if (billerDocumentId) {
       pdf.doc
         .font("Helvetica")
         .fontSize(10)
-        .text(`C.C. No. ${serviceJob.technician.documentId}`, {
+        .text(`C.C. No. ${billerDocumentId}`, {
           width: centerWidth,
           align: "center",
         });
@@ -647,7 +656,7 @@ export class DocumentsService {
 
     pdf.spacer(20);
     pdf.doc.font("Helvetica").fontSize(10).text("Atentamente.", 50, pdf.doc.y);
-    pdf.signatureLine(serviceJob.technician.fullName.toUpperCase());
+    pdf.signatureLine(billerName.toUpperCase());
 
     pdf.footer(
       `${branding.businessName} · Cuenta de cobro N° ${String(serviceJob.accountNumber).padStart(4, "0")}`,

@@ -85,6 +85,17 @@ model BusinessSettings {
   // en 1 al migrar a este sistema.
   nextServiceJobAccountNumber Int @default(1)
 
+  // Identidad que firma la cuenta de cobro de Servicios externos (ver
+  // DocumentsService.generateServiceJobAccount) — SIEMPRE el propietario
+  // del negocio, nunca el técnico que hizo el trabajo en sitio (su
+  // comisión se calcula aparte, pero el documento que recibe el cliente
+  // lo factura el dueño). Deliberadamente separado de User.fullName del
+  // Administrador: ese campo suele quedar con el valor genérico
+  // "Administrador" en vez del nombre legal real, así que no sirve para
+  // imprimir en un documento formal.
+  ownerFullName   String?
+  ownerDocumentId String?
+
   updatedAt DateTime @updatedAt
 
   @@map("business_settings")

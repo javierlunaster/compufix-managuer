@@ -1,4 +1,4 @@
-import { IsHexColor, IsOptional, IsString, IsNotEmpty, MaxLength } from "class-validator";
+import { IsHexColor, IsInt, IsOptional, IsString, IsNotEmpty, Min, MaxLength } from "class-validator";
 
 // Todos opcionales a propósito: el formulario de Configuración envía solo
 // los campos que la persona editó, no una foto completa del objeto — así
@@ -98,4 +98,25 @@ export class UpdateBusinessSettingsDto {
   @IsOptional()
   @IsHexColor({ message: "El color de acento (resaltado) debe ser un color hexadecimal" })
   accentStrongColor?: string;
+
+  // Identidad que firma la cuenta de cobro de Servicios externos — ver el
+  // comentario en schema.prisma. Deliberadamente distinto del nombre de
+  // usuario del Administrador.
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  ownerFullName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  ownerDocumentId?: string;
+
+  // Para continuar la numeración en papel que ya traía el taller (ver
+  // ServiceJobsService.create) — un ajuste puntual, no algo que se edite
+  // seguido.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  nextServiceJobAccountNumber?: number;
 }
