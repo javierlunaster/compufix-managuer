@@ -18,6 +18,12 @@ const DETAIL_INCLUDE = {
  * en una sola visita — la "cuenta de cobro" en papel que el taller ya
  * usaba. El pago se reparte entre el taller y el técnico según un % que
  * se fija por cada trabajo (no es una regla fija del negocio).
+ *
+ * A diferencia de una Venta, no se asume cobrado de una vez: se envía la
+ * cuenta de cobro y el pago del cliente llega después, así que
+ * clientPaymentStatus/technicianPaymentStatus son dos estados
+ * independientes, y nada toca Caja hasta que cada uno realmente ocurre
+ * (ver markClientPaid/markTechnicianPaid).
  */
 @Injectable()
 export class ServiceJobsService {
@@ -28,11 +34,6 @@ export class ServiceJobsService {
     private businessSettings: BusinessSettingsService,
   ) {}
 
-  /**
-   * Se asume el total cobrado de una vez (igual que una Venta, sin
-   * seguimiento de abonos) — por eso el ingreso del taller se registra en
-   * Caja de inmediato, al crear el trabajo, no al "cobrarlo" después.
-   */
   async create(dto: CreateServiceJobDto, actingUserId: number) {
     const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
     if (!customer) {
@@ -67,7 +68,7 @@ export class ServiceJobsService {
       });
       const accountNumber = updatedSettings.nextServiceJobAccountNumber - 1;
 
-      const created = await tx.serviceJob.create({
+      return tx.serviceJob.create({
         data: {
           accountNumber,
           date: new Date(dto.date),
@@ -89,16 +90,6 @@ export class ServiceJobsService {
         },
         include: DETAIL_INCLUDE,
       });
-
-      await this.cash.recordServiceJobIncomeIfRegisterOpen(tx, {
-        category: "Servicios externos",
-        amount: retentionAmount,
-        serviceJobId: created.id,
-        userId: actingUserId,
-        description: `Cuenta de cobro N° ${accountNumber} — ${customer.fullName} (parte del taller)`,
-      });
-
-      return created;
     });
 
     await this.audit.log({
@@ -119,10 +110,15 @@ export class ServiceJobsService {
     return serviceJob;
   }
 
-  async findAll(params: { technicianId?: number; paymentStatus?: PaymentStatus }) {
+  async findAll(params: {
+    technicianId?: number;
+    clientPaymentStatus?: PaymentStatus;
+    technicianPaymentStatus?: PaymentStatus;
+  }) {
     const where: Prisma.ServiceJobWhereInput = { status: "ACTIVE" };
     if (params.technicianId) where.technicianId = params.technicianId;
-    if (params.paymentStatus) where.paymentStatus = params.paymentStatus;
+    if (params.clientPaymentStatus) where.clientPaymentStatus = params.clientPaymentStatus;
+    if (params.technicianPaymentStatus) where.technicianPaymentStatus = params.technicianPaymentStatus;
 
     return this.prisma.serviceJob.findMany({
       where,
@@ -147,18 +143,65 @@ export class ServiceJobsService {
   }
 
   /**
+   * Registra que el cliente pagó la cuenta de cobro — el ingreso de caja
+   * es por chargedAmount COMPLETO (lo que de verdad entra a caja), no
+   * solo la parte del taller: si solo se registrara retentionAmount como
+   * ingreso, el arqueo de caja nunca tendría el dinero para después
+   * pagarle al técnico (ver markTechnicianPaid), y el saldo quedaría mal
+   * cuadrado. Con el ingreso completo aquí y el egreso de
+   * amountToPayTechnician al pagarle al técnico, el neto en caja termina
+   * siendo exactamente retentionAmount — la ganancia real del taller.
+   */
+  async markClientPaid(id: number, actingUserId: number) {
+    const serviceJob = await this.findOne(id);
+    if (serviceJob.clientPaymentStatus === "PAID") {
+      throw new BadRequestException("Ya se registró el pago del cliente para este trabajo");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.serviceJob.update({ where: { id }, data: { clientPaymentStatus: "PAID" } });
+
+      await this.cash.recordServiceJobIncomeIfRegisterOpen(tx, {
+        category: "Servicios externos",
+        amount: Number(serviceJob.chargedAmount),
+        serviceJobId: id,
+        userId: actingUserId,
+        description: `Cliente pagó cuenta de cobro N° ${serviceJob.accountNumber} — ${serviceJob.customer.fullName}`,
+      });
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "MARK_CLIENT_PAID",
+      entityType: "ServiceJob",
+      entityId: id,
+      previousValue: { clientPaymentStatus: serviceJob.clientPaymentStatus },
+      newValue: { clientPaymentStatus: "PAID", amount: serviceJob.chargedAmount },
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
    * Le paga al técnico su parte completa (amountToPayTechnician) de una
    * sola vez — no hay pagos parciales para esto, es una comisión puntual
-   * por un trabajo ya cerrado, no una deuda grande a plazos.
+   * por un trabajo ya cerrado, no una deuda grande a plazos. Exige que el
+   * cliente ya haya pagado (ver markClientPaid): pagarle al técnico antes
+   * sacaría de caja un dinero que el taller todavía no ha recibido.
    */
   async markTechnicianPaid(id: number, actingUserId: number) {
     const serviceJob = await this.findOne(id);
-    if (serviceJob.paymentStatus === "PAID") {
+    if (serviceJob.clientPaymentStatus !== "PAID") {
+      throw new BadRequestException(
+        "El cliente todavía no ha pagado esta cuenta de cobro — regístralo primero",
+      );
+    }
+    if (serviceJob.technicianPaymentStatus === "PAID") {
       throw new BadRequestException("Ya se le pagó al técnico este trabajo");
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.serviceJob.update({ where: { id }, data: { paymentStatus: "PAID" } });
+      await tx.serviceJob.update({ where: { id }, data: { technicianPaymentStatus: "PAID" } });
 
       await this.cash.recordTechnicianPaymentExpenseIfRegisterOpen(tx, {
         category: "Pago a técnico",
@@ -174,8 +217,8 @@ export class ServiceJobsService {
       action: "MARK_TECHNICIAN_PAID",
       entityType: "ServiceJob",
       entityId: id,
-      previousValue: { paymentStatus: serviceJob.paymentStatus },
-      newValue: { paymentStatus: "PAID", amount: serviceJob.amountToPayTechnician },
+      previousValue: { technicianPaymentStatus: serviceJob.technicianPaymentStatus },
+      newValue: { technicianPaymentStatus: "PAID", amount: serviceJob.amountToPayTechnician },
     });
 
     return this.findOne(id);

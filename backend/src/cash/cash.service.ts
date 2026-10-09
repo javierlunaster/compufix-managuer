@@ -280,10 +280,13 @@ export class CashService {
   }
 
   /**
-   * Ingreso automático al registrar un trabajo de Servicios externos (ver
-   * ServiceJobsService.create) — la parte que se queda el taller
-   * (chargedAmount - amountToPayTechnician), igual que una Venta: se
-   * asume cobrado de una vez, no hay seguimiento de abonos parciales.
+   * Ingreso al registrar que el cliente pagó una cuenta de cobro de
+   * Servicios externos (ver ServiceJobsService.markClientPaid) — por el
+   * chargedAmount COMPLETO, no solo la parte del taller: ese dinero
+   * incluye lo que después hay que pagarle al técnico (ver
+   * recordTechnicianPaymentExpenseIfRegisterOpen), así que debe entrar
+   * todo a caja primero. A diferencia de una Venta, NO se asume cobrado
+   * al crear el trabajo — el pago del cliente puede tardar.
    */
   async recordServiceJobIncomeIfRegisterOpen(
     tx: PrismaTxClient,

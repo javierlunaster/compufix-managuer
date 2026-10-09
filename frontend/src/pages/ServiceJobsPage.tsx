@@ -93,6 +93,7 @@ export function ServiceJobsPage() {
                 <th className="px-4 py-2">Cliente</th>
                 <th className="px-4 py-2">Técnico</th>
                 <th className="px-4 py-2">Total</th>
+                <th className="px-4 py-2">Pago del cliente</th>
                 <th className="px-4 py-2">Pago al técnico</th>
               </tr>
             </thead>
@@ -109,12 +110,15 @@ export function ServiceJobsPage() {
                   <td className="px-4 py-3 text-ink">{j.technician.fullName}</td>
                   <td className="px-4 py-3 tabular text-ink">{formatCurrency(j.chargedAmount)}</td>
                   <td className="px-4 py-3">
+                    <span className={j.clientPaymentStatus === "PAID" ? "text-success" : "text-warning"}>
+                      {PAYMENT_STATUS_LABELS[j.clientPaymentStatus] ?? j.clientPaymentStatus}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
                     <span
-                      className={
-                        j.paymentStatus === "PAID" ? "text-success" : "text-warning"
-                      }
+                      className={j.technicianPaymentStatus === "PAID" ? "text-success" : "text-warning"}
                     >
-                      {PAYMENT_STATUS_LABELS[j.paymentStatus] ?? j.paymentStatus}
+                      {PAYMENT_STATUS_LABELS[j.technicianPaymentStatus] ?? j.technicianPaymentStatus}
                     </span>
                   </td>
                 </tr>

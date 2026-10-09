@@ -539,7 +539,11 @@ export type ServiceJobListItem = {
   chargedAmount: string;
   retentionAmount: string;
   amountToPayTechnician: string;
-  paymentStatus: "PENDING" | "PARTIAL" | "PAID";
+  // Dos estados independientes: si el cliente ya pagó la cuenta de cobro
+  // (dispara el ingreso de caja) y si ya se le pagó al técnico su comisión
+  // (requiere que el cliente haya pagado primero) — ver ServiceJobsService.
+  clientPaymentStatus: "PENDING" | "PARTIAL" | "PAID";
+  technicianPaymentStatus: "PENDING" | "PARTIAL" | "PAID";
   customer: { id: number; fullName: string };
   technician: { id: number; fullName: string };
   items: { id: number }[];

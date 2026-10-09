@@ -558,10 +558,16 @@ model ServiceJob {
   // dos montos al crear el registro).
   retentionAmount       Decimal       @db.Decimal(12, 2)
   amountToPayTechnician Decimal       @db.Decimal(12, 2)
-  // Si ya se le pagó al técnico su parte (ver
-  // ServiceJobsService.markTechnicianPaid) — NO es si el cliente pagó el
-  // servicio (eso se asume cobrado de una vez, igual que una Venta).
-  paymentStatus         PaymentStatus @default(PENDING)
+  // A diferencia de una Venta (que se asume cobrada de una vez), un
+  // servicio externo se factura y el pago del cliente puede tardar — así
+  // que son DOS estados independientes: si el cliente ya pagó la cuenta
+  // de cobro (dispara el ingreso de caja por chargedAmount completo, ver
+  // ServiceJobsService.markClientPaid) y si ya se le pagó al técnico su
+  // comisión (el egreso de caja por amountToPayTechnician, ver
+  // markTechnicianPaid — solo se puede marcar DESPUÉS de que el cliente
+  // pagó, para no sacar de caja un dinero que todavía no entró).
+  clientPaymentStatus     PaymentStatus @default(PENDING)
+  technicianPaymentStatus PaymentStatus @default(PENDING)
   notes                 String?
   // Para anular una cuenta de cobro sin borrar el historial (igual que el
   // resto del sistema) — nunca se reutiliza su accountNumber.

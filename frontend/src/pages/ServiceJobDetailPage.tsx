@@ -19,27 +19,7 @@ export function ServiceJobDetailPage() {
     reload,
   } = useFetch(() => api.get<ServiceJobDetail>(`/service-jobs/${id}`), [id]);
 
-  const [markingPaid, setMarkingPaid] = useState(false);
-  const [markError, setMarkError] = useState<string | null>(null);
-
-  const canManagePayment = user?.role === "Administrador" || user?.role === "Gerente";
-
-  async function handleMarkPaid() {
-    if (!job) return;
-    if (!confirm(`¿Confirmar que se le pagó ${formatCurrency(job.amountToPayTechnician)} a ${job.technician.fullName}?`)) {
-      return;
-    }
-    setMarkError(null);
-    setMarkingPaid(true);
-    try {
-      await api.post(`/service-jobs/${job.id}/mark-technician-paid`);
-      reload();
-    } catch (err) {
-      setMarkError(err instanceof ApiError ? err.message : "No se pudo registrar el pago");
-    } finally {
-      setMarkingPaid(false);
-    }
-  }
+  const canManageTechnicianPayment = user?.role === "Administrador" || user?.role === "Gerente";
 
   if (loading) {
     return (
@@ -86,38 +66,23 @@ export function ServiceJobDetailPage() {
           <div>
             <p className="text-xs uppercase text-ink-muted">Pago al técnico</p>
             <p
-              className={`tabular text-lg ${job.paymentStatus === "PAID" ? "text-success" : "text-warning"}`}
+              className={`tabular text-lg ${job.technicianPaymentStatus === "PAID" ? "text-success" : "text-warning"}`}
             >
               {formatCurrency(job.amountToPayTechnician)}{" "}
               <span className="text-xs font-normal">
-                ({PAYMENT_STATUS_LABELS[job.paymentStatus] ?? job.paymentStatus})
+                ({PAYMENT_STATUS_LABELS[job.technicianPaymentStatus] ?? job.technicianPaymentStatus})
               </span>
             </p>
           </div>
         </div>
-
-        {job.paymentStatus !== "PAID" && (
-          <div className="mt-4 border-t border-border pt-4">
-            {canManagePayment ? (
-              <>
-                {markError && (
-                  <div className="mb-2">
-                    <ErrorBanner message={markError} />
-                  </div>
-                )}
-                <Button variant="primary" onClick={handleMarkPaid} disabled={markingPaid}>
-                  {markingPaid ? "Registrando…" : "Marcar como pagado al técnico"}
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-ink-muted">
-                Falta pagarle al técnico su parte — solo un Administrador o Gerente puede
-                registrarlo.
-              </p>
-            )}
-          </div>
-        )}
       </Card>
+
+      <ClientPaymentCard job={job} onChanged={reload} />
+      <TechnicianPaymentCard
+        job={job}
+        canManage={canManageTechnicianPayment}
+        onChanged={reload}
+      />
 
       <Card>
         <CardHeader title="Equipos atendidos" />
@@ -150,5 +115,143 @@ export function ServiceJobDetailPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Registrar que el cliente pagó la cuenta de cobro — se envía antes y se
+ * cobra después, no es como una venta que se asume cobrada de una vez
+ * (ver ServiceJobsService.markClientPaid). Abierto a cualquier personal,
+ * igual que registrar un abono normal.
+ */
+function ClientPaymentCard({
+  job,
+  onChanged,
+}: {
+  job: ServiceJobDetail;
+  onChanged: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleMarkPaid() {
+    if (!confirm(`¿Confirmar que ${job.customer.fullName} pagó ${formatCurrency(job.chargedAmount)}?`)) {
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await api.post(`/service-jobs/${job.id}/mark-client-paid`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo registrar el pago");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Pago del cliente"
+        subtitle={`${formatCurrency(job.chargedAmount)} — ${PAYMENT_STATUS_LABELS[job.clientPaymentStatus] ?? job.clientPaymentStatus}`}
+      />
+      <div className="p-4">
+        {error && (
+          <div className="mb-2">
+            <ErrorBanner message={error} />
+          </div>
+        )}
+        {job.clientPaymentStatus === "PAID" ? (
+          <p className="text-sm text-success">El cliente ya pagó esta cuenta de cobro.</p>
+        ) : (
+          <Button variant="primary" onClick={handleMarkPaid} disabled={saving}>
+            {saving ? "Registrando…" : "Marcar como pagado por el cliente"}
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Pagarle al técnico su comisión — restringido a Administrador/Gerente
+ * (dinero real saliendo de caja) y bloqueado hasta que el cliente haya
+ * pagado (ver ServiceJobsService.markTechnicianPaid): no tiene sentido
+ * sacar de caja un dinero que el taller todavía no ha recibido.
+ */
+function TechnicianPaymentCard({
+  job,
+  canManage,
+  onChanged,
+}: {
+  job: ServiceJobDetail;
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleMarkPaid() {
+    if (
+      !confirm(
+        `¿Confirmar que se le pagó ${formatCurrency(job.amountToPayTechnician)} a ${job.technician.fullName}?`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await api.post(`/service-jobs/${job.id}/mark-technician-paid`);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo registrar el pago");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (job.technicianPaymentStatus === "PAID") {
+    return (
+      <Card>
+        <CardHeader title="Pago al técnico" />
+        <p className="p-4 text-sm text-success">
+          Ya se le pagó a {job.technician.fullName} su comisión de{" "}
+          {formatCurrency(job.amountToPayTechnician)}.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title="Pago al técnico"
+        subtitle={`${formatCurrency(job.amountToPayTechnician)} para ${job.technician.fullName}`}
+      />
+      <div className="p-4">
+        {error && (
+          <div className="mb-2">
+            <ErrorBanner message={error} />
+          </div>
+        )}
+        {job.clientPaymentStatus !== "PAID" ? (
+          <p className="text-sm text-ink-muted">
+            El cliente todavía no ha pagado esta cuenta de cobro — regístralo primero para poder
+            pagarle al técnico.
+          </p>
+        ) : canManage ? (
+          <Button variant="primary" onClick={handleMarkPaid} disabled={saving}>
+            {saving ? "Registrando…" : "Marcar como pagado al técnico"}
+          </Button>
+        ) : (
+          <p className="text-sm text-ink-muted">
+            Falta pagarle al técnico su parte — solo un Administrador o Gerente puede
+            registrarlo.
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }
