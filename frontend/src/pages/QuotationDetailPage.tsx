@@ -2,8 +2,15 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Product, QuotationDetail, QuotationStatus, Service } from "@/lib/types";
-import { QUOTATION_STATUSES, QUOTATION_STATUS_LABELS } from "@/lib/types";
+import type {
+  Paginated,
+  Product,
+  QuotationDetail,
+  QuotationStatus,
+  RepairOrderListItem,
+  Service,
+} from "@/lib/types";
+import { QUOTATION_STATUSES, QUOTATION_STATUS_LABELS, REPAIR_STATUS_LABELS } from "@/lib/types";
 import { ProductSearch } from "@/components/ProductSearch";
 import { ServiceSearch } from "@/components/ServiceSearch";
 import { DownloadPdfButton } from "@/components/DownloadPdfButton";
@@ -207,10 +214,7 @@ export function QuotationDetailPage() {
         )}
 
         {quotation.status === "APPROVED" && !quotation.sourceOrder && (
-          <p className="mt-3 text-xs text-warning">
-            Esta cotización no está asociada a una orden de reparación, así que no se puede convertir
-            automáticamente.
-          </p>
+          <AssignOrderPanel quotation={quotation} onAssigned={reload} />
         )}
 
         <div className="mt-4 grid grid-cols-4 gap-4 border-t border-border pt-4 text-sm">
@@ -266,6 +270,117 @@ export function QuotationDetailPage() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Una cotización "suelta" (no nació del diagnóstico de una orden) no se
+ * puede convertir automáticamente (ver QuotationsService.convert) porque no
+ * hay a qué equipo asociar los repuestos/servicios. Una vez que el cliente
+ * ya la aprobó, esto deja asignarla a una orden de reparación existente del
+ * mismo cliente — después de eso, "Convertir en reparación" queda
+ * disponible igual que con cualquier otra cotización.
+ */
+function AssignOrderPanel({
+  quotation,
+  onAssigned,
+}: {
+  quotation: QuotationDetail;
+  onAssigned: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: orders, loading } = useFetch(
+    () =>
+      open
+        ? api.get<Paginated<RepairOrderListItem>>("/repair-orders", {
+            customerId: quotation.customer.id,
+            pageSize: 50,
+          })
+        : Promise.resolve(null),
+    [open, quotation.customer.id],
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function assign(orderId: number) {
+    setError(null);
+    setBusy(true);
+    try {
+      await api.patch(`/quotations/${quotation.id}/assign-order`, { orderId });
+      onAssigned();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo asignar la orden");
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-3 rounded border border-warning/30 bg-warning/5 p-3">
+        <p className="text-xs text-warning">
+          Esta cotización no está asociada a una orden de reparación, así que no se puede convertir
+          automáticamente.
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-2 text-xs text-accent hover:underline"
+        >
+          Asignar a una orden de reparación…
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded border border-border bg-surface-raised p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-ink">
+          Órdenes de {quotation.customer.fullName}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          disabled={busy}
+          className="text-xs text-ink-muted hover:text-ink"
+        >
+          Cancelar
+        </button>
+      </div>
+      {error && (
+        <div className="mt-2">
+          <ErrorBanner message={error} />
+        </div>
+      )}
+      {loading && <p className="mt-2 text-xs text-ink-muted">Buscando órdenes…</p>}
+      {orders && orders.data.length === 0 && (
+        <p className="mt-2 text-xs text-ink-muted">
+          Este cliente no tiene órdenes de reparación activas.
+        </p>
+      )}
+      {orders && orders.data.length > 0 && (
+        <ul className="mt-2 divide-y divide-border">
+          {orders.data.map((o) => (
+            <li key={o.id} className="flex items-center justify-between py-2">
+              <div className="text-sm">
+                <span className="font-mono text-xs text-accent">{o.orderCode}</span>{" "}
+                <span className="text-ink-muted">
+                  {o.device.model ?? "Equipo"} · {REPAIR_STATUS_LABELS[o.status]}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => assign(o.id)}
+              >
+                Asignar
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

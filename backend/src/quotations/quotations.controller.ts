@@ -15,6 +15,7 @@ import { CreateQuotationDto } from "./dto/create-quotation.dto";
 import { UpdateQuotationDto } from "./dto/update-quotation.dto";
 import { UpdateQuotationStatusDto } from "./dto/update-quotation-status.dto";
 import { CreateQuotationItemDto } from "./dto/create-quotation-item.dto";
+import { AssignQuotationOrderDto } from "./dto/assign-quotation-order.dto";
 import { CurrentUser, AuthenticatedUser } from "../auth/decorators/current-user.decorator";
 
 @Controller("quotations")
@@ -84,6 +85,15 @@ export class QuotationsController {
   @Delete(":id")
   remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() actingUser: AuthenticatedUser) {
     return this.quotationsService.remove(id, actingUser.id);
+  }
+
+  @Patch(":id/assign-order")
+  assignToOrder(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() dto: AssignQuotationOrderDto,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    return this.quotationsService.assignToOrder(id, dto.orderId, actingUser.id);
   }
 
   @Post(":id/convert")

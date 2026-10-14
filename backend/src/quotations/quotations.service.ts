@@ -366,6 +366,55 @@ export class QuotationsService {
   }
 
   /**
+   * Asocia una cotización "suelta" (sin sourceOrderId, se creó sin venir del
+   * diagnóstico de una orden) a una orden de reparación ya existente —
+   * necesario para poder convertirla después (ver convert(), que exige
+   * sourceOrderId). Solo tiene sentido una vez que el cliente ya aprobó la
+   * cotización: antes de eso no hay nada que convertir, y permitirlo
+   * generaría la tentación de "reservar" una orden para una cotización que
+   * todavía puede cambiar o rechazarse.
+   */
+  async assignToOrder(id: number, orderId: number, actingUserId: number) {
+    const quotation = await this.prisma.customerQuotation.findUnique({ where: { id } });
+    if (!quotation) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (quotation.sourceOrderId) {
+      throw new BadRequestException("Esta cotización ya está asociada a una orden de reparación");
+    }
+    if (quotation.status !== QuotationStatus.APPROVED) {
+      throw new BadRequestException(
+        "Solo se puede asignar a una orden de reparación una cotización ya aprobada por el cliente",
+      );
+    }
+
+    const order = await this.prisma.repairOrder.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException("La orden de reparación indicada no existe");
+    }
+    if (order.customerId !== quotation.customerId) {
+      throw new BadRequestException(
+        "La orden de reparación indicada no pertenece al mismo cliente de la cotización",
+      );
+    }
+
+    await this.prisma.customerQuotation.update({
+      where: { id },
+      data: { sourceOrderId: orderId },
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "ASSIGN_ORDER",
+      entityType: "CustomerQuotation",
+      entityId: id,
+      newValue: { sourceOrderId: orderId },
+    });
+
+    return this.findOne(id);
+  }
+
+  /**
    * Convierte una cotización APROBADA en la reparación real (sección 10 del
    * brief: "una cotización aprobada puede convertirse directamente en una
    * orden de reparación"). Requiere que la cotización tenga `sourceOrderId`

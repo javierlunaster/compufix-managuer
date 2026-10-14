@@ -244,6 +244,7 @@ export class RepairOrdersService {
       status?: RepairStatus;
       technicianId?: number;
       pendingBalance?: boolean;
+      customerId?: number;
       page?: number;
       pageSize?: number;
     },
@@ -253,6 +254,9 @@ export class RepairOrdersService {
 
     if (params.status) {
       where.status = params.status;
+    }
+    if (params.customerId) {
+      where.customerId = params.customerId;
     }
     // Un Técnico solo ve lo que le asignaron — se ignora cualquier
     // technicianId que haya venido en la consulta, nunca se le deja
