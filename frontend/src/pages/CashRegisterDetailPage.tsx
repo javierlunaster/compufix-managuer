@@ -66,6 +66,7 @@ export function CashRegisterDetailPage() {
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
                 <th className="px-4 py-2">Hora</th>
                 <th className="px-4 py-2">Categoría</th>
+                <th className="px-4 py-2">Descripción</th>
                 <th className="px-4 py-2">Monto</th>
                 <th className="px-4 py-2">Reparación</th>
                 <th className="px-4 py-2">Usuario</th>
@@ -76,6 +77,7 @@ export function CashRegisterDetailPage() {
                 <tr key={m.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-2 tabular text-ink-muted">{formatDateTime(m.date)}</td>
                   <td className="px-4 py-2 text-ink">{m.category}</td>
+                  <td className="px-4 py-2 text-ink-muted">{m.description || "—"}</td>
                   <td className={`px-4 py-2 tabular ${m.type === "INCOME" ? "text-success" : "text-danger"}`}>
                     {m.type === "INCOME" ? "+" : "-"}
                     {formatCurrency(m.amount)}
