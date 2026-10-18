@@ -130,6 +130,14 @@ export function ProductDetailPage() {
             <Detail label="Costo" value={formatCurrency(product.cost)} />
             <Detail label="Precio de venta" value={formatCurrency(product.salePrice)} />
             <Detail label="Stock mínimo" value={String(product.minStock)} />
+            <Detail
+              label="Garantía"
+              value={
+                product.warrantyMonths
+                  ? `${product.warrantyMonths} ${product.warrantyMonths === 1 ? "mes" : "meses"}`
+                  : null
+              }
+            />
           </dl>
           <div className="border-t border-border px-4 py-3">
             <span className="text-xs uppercase tracking-wide text-ink-muted">Stock actual</span>

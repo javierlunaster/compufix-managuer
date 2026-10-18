@@ -136,6 +136,7 @@ export function ProductsPage() {
                 <th className="px-4 py-2">Descripción</th>
                 <th className="px-4 py-2">Categoría</th>
                 <th className="px-4 py-2">Stock</th>
+                <th className="px-4 py-2">Garantía</th>
                 <th className="px-4 py-2">Precio</th>
               </tr>
             </thead>
@@ -154,6 +155,9 @@ export function ProductsPage() {
                       {p.stock}
                     </span>
                     <span className="text-ink-muted"> / mín. {p.minStock}</span>
+                  </td>
+                  <td className="px-4 py-3 text-ink-muted">
+                    {p.warrantyMonths ? `${p.warrantyMonths} ${p.warrantyMonths === 1 ? "mes" : "meses"}` : "—"}
                   </td>
                   <td className="px-4 py-3 tabular text-ink">{formatCurrency(p.salePrice)}</td>
                 </tr>
@@ -278,6 +282,7 @@ function NewProductForm({
   const [salePrice, setSalePrice] = useState("");
   const [minStock, setMinStock] = useState("0");
   const [initialStock, setInitialStock] = useState("0");
+  const [warrantyMonths, setWarrantyMonths] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [photoFiles, setPhotoFiles] = useState<FileList | null>(null);
 
@@ -319,6 +324,7 @@ function NewProductForm({
         salePrice: salePrice ? Number(salePrice) : undefined,
         minStock: Number(minStock) || 0,
         initialStock: Number(initialStock) || 0,
+        warrantyMonths: warrantyMonths ? Number(warrantyMonths) : undefined,
       });
 
       if (photoFiles && photoFiles.length > 0) {
@@ -434,6 +440,17 @@ function NewProductForm({
             />
           </Field>
         </div>
+
+        <Field label="Garantía (meses, opcional)">
+          <Input
+            type="number"
+            min={0}
+            value={warrantyMonths}
+            onChange={(e) => setWarrantyMonths(e.target.value)}
+            placeholder="Ej. 12"
+            className="max-w-[10rem]"
+          />
+        </Field>
 
         <Field label="Fotos para el catálogo (opcional)">
           <input
