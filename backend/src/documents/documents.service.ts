@@ -555,6 +555,100 @@ export class DocumentsService {
   }
 
   /**
+   * Recibo de una venta de mostrador (ver SalesService) — detalla cada
+   * artículo comprado junto con su garantía, calculada igual que
+   * WarrantiesService.create (fecha de la venta + Product.warrantyMonths).
+   * Un producto sin warrantyMonths configurado sale como "Sin garantía" —
+   * nunca se inventa un plazo que el catálogo no tiene.
+   */
+  async generateSaleReceipt(saleId: number, actingUserId: number) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        customer: { select: { fullName: true, phone: true, documentId: true } },
+        seller: { select: { fullName: true } },
+        items: {
+          include: { product: { select: { sku: true, description: true, warrantyMonths: true } } },
+        },
+      },
+    });
+    if (!sale) {
+      throw new NotFoundException("Venta no encontrada");
+    }
+    const branding = await this.businessSettings.getBrandingForDocuments();
+
+    const pdf = new PdfBuilder();
+    pdf.header({
+      docTitle: "Recibo de venta",
+      docSubtitle: `${sale.invoiceNumber ?? `#${sale.id}`} · ${formatDate(sale.date)}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
+    });
+
+    pdf.sectionTitle("Cliente").keyValueGrid(
+      sale.customer
+        ? [
+            ["Nombre", sale.customer.fullName],
+            ["Teléfono", sale.customer.phone],
+          ]
+        : [["Nombre", "Venta de mostrador (sin cliente registrado)"]],
+    );
+
+    pdf.sectionTitle("Artículos comprados");
+    pdf.table(
+      ["Producto", "Cant.", "Precio unit.", "Subtotal", "Garantía"],
+      sale.items.map((item) => {
+        const months = item.product.warrantyMonths;
+        let warrantyText = "Sin garantía";
+        if (months && months > 0) {
+          const warrantyEndDate = new Date(sale.date);
+          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + months);
+          warrantyText = `${months} ${months === 1 ? "mes" : "meses"} (vence ${formatDate(warrantyEndDate)})`;
+        }
+        return [
+          item.product.description,
+          String(item.quantity),
+          formatCurrency(item.unitPrice),
+          formatCurrency(item.subtotal),
+          warrantyText,
+        ];
+      }),
+      [140, 40, 80, 80, 150],
+    );
+
+    pdf.spacer(10);
+    pdf.keyValueGrid([
+      ["Subtotal", formatCurrency(sale.subtotal)],
+      ["Descuento", formatCurrency(sale.discount)],
+    ]);
+
+    pdf.spacer(10);
+    pdf.doc.fontSize(14).fillColor("#111827").text(`Total: ${formatCurrency(sale.total)}`, {
+      align: "right",
+    });
+
+    pdf.spacer(20);
+    pdf.paragraph(
+      "La garantía de cada artículo se cuenta a partir de la fecha de esta venta y cubre " +
+        "defectos de fábrica — no cubre daños por mal uso, golpes, líquidos o manipulación por " +
+        "terceros. Conserva este recibo para hacerla válida.",
+    );
+
+    pdf.footer(`${branding.businessName} · Recibo de venta ${sale.invoiceNumber ?? `#${sale.id}`}`);
+
+    const buffer = await pdf.build();
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "GENERATE_RECEIPT",
+      entityType: "Sale",
+      entityId: saleId,
+    });
+
+    return { buffer, filename: `recibo-venta-${sale.invoiceNumber ?? sale.id}.pdf` };
+  }
+
+  /**
    * "Cuenta de cobro" de un Servicio externo (ver ServiceJobsService) —
    * reproduce el formato en papel que ya usaba el taller: carta formal del
    * técnico (quien presta el servicio y cobra) dirigida al cliente, con el

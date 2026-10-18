@@ -4,6 +4,7 @@ import { useFetch } from "@/lib/useFetch";
 import type { Customer, Paginated, PaymentMethod, Product, Sale } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { ProductSearch } from "@/components/ProductSearch";
+import { DownloadPdfButton } from "@/components/DownloadPdfButton";
 import {
   Button,
   Card,
@@ -258,11 +259,18 @@ export function SalesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2">
-                    {s.status === "ACTIVE" && (
-                      <button onClick={() => handleCancel(s.id)} className="text-xs text-danger hover:underline">
-                        Cancelar
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <DownloadPdfButton
+                        path={`/sales/${s.id}/document`}
+                        filename={`recibo-venta-${s.invoiceNumber ?? s.id}.pdf`}
+                        label="Recibo"
+                      />
+                      {s.status === "ACTIVE" && (
+                        <button onClick={() => handleCancel(s.id)} className="text-xs text-danger hover:underline">
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

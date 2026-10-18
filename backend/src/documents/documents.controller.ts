@@ -94,6 +94,22 @@ export class DocumentsController {
     });
   }
 
+  @Get("sales/:saleId/document")
+  @Header("Content-Type", "application/pdf")
+  async saleReceipt(
+    @Param("saleId", ParseIntPipe) saleId: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    const { buffer, filename } = await this.documentsService.generateSaleReceipt(
+      saleId,
+      actingUser.id,
+    );
+    return new StreamableFile(buffer, {
+      type: "application/pdf",
+      disposition: asAttachment(filename),
+    });
+  }
+
   @Get("service-jobs/:serviceJobId/document")
   @Header("Content-Type", "application/pdf")
   async serviceJobAccount(
