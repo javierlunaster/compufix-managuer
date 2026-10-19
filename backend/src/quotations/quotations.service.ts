@@ -166,21 +166,34 @@ export class QuotationsService {
     return quotation;
   }
 
-  private async ensureDraft(id: number) {
+  // Se puede seguir editando (totales, ítems) mientras el cliente todavía
+  // no se ha pronunciado — incluye SENT/PENDING además de DRAFT, porque en
+  // la práctica una cotización ya enviada suele necesitar un ajuste (ej.
+  // corregir el envío o el impuesto) antes de que el cliente la apruebe.
+  // Una vez aprobada, rechazada, vencida o convertida, el número ya quedó
+  // comunicado o ya generó efectos reales, así que se bloquea: si hace
+  // falta corregirla, primero hay que devolverla a Borrador/Enviada con
+  // updateStatus().
+  private async ensureEditable(id: number) {
     const quotation = await this.prisma.customerQuotation.findUnique({ where: { id } });
     if (!quotation) {
       throw new NotFoundException("Cotización no encontrada");
     }
-    if (quotation.status !== QuotationStatus.DRAFT) {
+    const editableStatuses: QuotationStatus[] = [
+      QuotationStatus.DRAFT,
+      QuotationStatus.SENT,
+      QuotationStatus.PENDING,
+    ];
+    if (!editableStatuses.includes(quotation.status)) {
       throw new BadRequestException(
-        "Solo se pueden editar cotizaciones en estado Borrador — cambia su estado de vuelta a Borrador si necesitas modificarla",
+        "Esta cotización ya no se puede editar — cambia su estado de vuelta a Borrador o Enviada si necesitas modificarla",
       );
     }
     return quotation;
   }
 
   async update(id: number, dto: UpdateQuotationDto, actingUserId: number) {
-    await this.ensureDraft(id);
+    await this.ensureEditable(id);
 
     const items = await this.prisma.quotationItem.findMany({ where: { quotationId: id } });
     const { subtotal, total } = computeTotals(
@@ -215,7 +228,7 @@ export class QuotationsService {
   }
 
   async addItem(quotationId: number, dto: CreateQuotationItemDto, actingUserId: number) {
-    await this.ensureDraft(quotationId);
+    await this.ensureEditable(quotationId);
 
     const quantity = dto.quantity ?? 1;
 
@@ -246,7 +259,7 @@ export class QuotationsService {
   }
 
   async removeItem(quotationId: number, itemId: number, actingUserId: number) {
-    await this.ensureDraft(quotationId);
+    await this.ensureEditable(quotationId);
 
     const item = await this.prisma.quotationItem.findUnique({ where: { id: itemId } });
     if (!item || item.quotationId !== quotationId) {

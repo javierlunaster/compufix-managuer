@@ -19,6 +19,8 @@ import {
   Card,
   CardHeader,
   ErrorBanner,
+  Field,
+  Input,
   Select,
   Spinner,
 } from "@/components/ui";
@@ -37,6 +39,7 @@ export function QuotationDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [editingTotals, setEditingTotals] = useState(false);
 
   if (loading) {
     return (
@@ -49,7 +52,11 @@ export function QuotationDetailPage() {
     return <ErrorBanner message={error ?? "Cotización no encontrada"} />;
   }
 
-  const isDraft = quotation.status === "DRAFT";
+  // Se puede seguir editando mientras el cliente todavía no se ha
+  // pronunciado (ver QuotationsService.ensureEditable en el backend) — una
+  // vez aprobada, rechazada, vencida o convertida, se bloquea.
+  const isEditable =
+    quotation.status === "DRAFT" || quotation.status === "SENT" || quotation.status === "PENDING";
 
   async function handleStatusChange(newStatus: QuotationStatus) {
     if (!newStatus) return;
@@ -184,6 +191,15 @@ export function QuotationDetailPage() {
                 Convertir en reparación
               </Button>
             )}
+            {isEditable && (
+              <button
+                type="button"
+                onClick={() => setEditingTotals((e) => !e)}
+                className="text-xs text-accent hover:underline"
+              >
+                {editingTotals ? "Cancelar edición" : "Editar cotización"}
+              </button>
+            )}
             {quotation.status !== "CONVERTED" &&
               (confirmingRemove ? (
                 <div className="flex items-center gap-2">
@@ -217,12 +233,23 @@ export function QuotationDetailPage() {
           <AssignOrderPanel quotation={quotation} onAssigned={reload} />
         )}
 
-        <div className="mt-4 grid grid-cols-4 gap-4 border-t border-border pt-4 text-sm">
-          <Money label="Subtotal" value={quotation.subtotal} />
-          <Money label="Descuento" value={quotation.discount} />
-          <Money label="Impuesto + envío" value={String(Number(quotation.tax) + Number(quotation.shipping))} />
-          <Money label="Total" value={quotation.total} emphasize />
-        </div>
+        {editingTotals ? (
+          <EditQuotationTotalsForm
+            quotation={quotation}
+            onSaved={() => {
+              setEditingTotals(false);
+              reload();
+            }}
+            onCancel={() => setEditingTotals(false)}
+          />
+        ) : (
+          <div className="mt-4 grid grid-cols-4 gap-4 border-t border-border pt-4 text-sm">
+            <Money label="Subtotal" value={quotation.subtotal} />
+            <Money label="Descuento" value={quotation.discount} />
+            <Money label="Impuesto + envío" value={String(Number(quotation.tax) + Number(quotation.shipping))} />
+            <Money label="Total" value={quotation.total} emphasize />
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -234,7 +261,7 @@ export function QuotationDetailPage() {
               <th className="px-4 py-2">Cant.</th>
               <th className="px-4 py-2">Precio unit.</th>
               <th className="px-4 py-2">Subtotal</th>
-              {isDraft && <th />}
+              {isEditable && <th />}
             </tr>
           </thead>
           <tbody>
@@ -244,7 +271,7 @@ export function QuotationDetailPage() {
                 <td className="px-4 py-2 tabular text-ink-muted">{item.quantity}</td>
                 <td className="px-4 py-2 tabular text-ink-muted">{formatCurrency(item.unitPrice)}</td>
                 <td className="px-4 py-2 tabular text-ink">{formatCurrency(item.subtotal)}</td>
-                {isDraft && (
+                {isEditable && (
                   <td className="px-4 py-2">
                     <button
                       onClick={() => removeItem(item.id)}
@@ -259,7 +286,7 @@ export function QuotationDetailPage() {
           </tbody>
         </table>
 
-        {isDraft && (
+        {isEditable && (
           <div className="flex flex-wrap items-end gap-3 border-t border-border p-4">
             <div className="min-w-[16rem] flex-1">
               <ProductSearch onSelect={addPart} placeholder="Agregar repuesto…" />
@@ -382,6 +409,84 @@ function AssignOrderPanel({
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Edita descuento/impuesto/envío/vigencia/notas — mientras la cotización
+ * siga editable (ver QuotationsService.ensureEditable: DRAFT/SENT/PENDING).
+ * Los ítems se recotizan aparte (agregar/quitar en la tabla de arriba);
+ * esto es solo los cargos globales de la cotización.
+ */
+function EditQuotationTotalsForm({
+  quotation,
+  onSaved,
+  onCancel,
+}: {
+  quotation: QuotationDetail;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [discount, setDiscount] = useState(quotation.discount);
+  const [tax, setTax] = useState(quotation.tax);
+  const [shipping, setShipping] = useState(quotation.shipping);
+  const [validUntil, setValidUntil] = useState(quotation.validUntil?.slice(0, 10) ?? "");
+  const [notes, setNotes] = useState(quotation.notes ?? "");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await api.patch(`/quotations/${quotation.id}`, {
+        discount: Number(discount) || 0,
+        tax: Number(tax) || 0,
+        shipping: Number(shipping) || 0,
+        validUntil: validUntil || undefined,
+        notes: notes || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar los cambios");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 space-y-3 border-t border-border pt-4">
+      {error && <ErrorBanner message={error} />}
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Descuento">
+          <Input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+        </Field>
+        <Field label="Impuesto">
+          <Input type="number" min={0} value={tax} onChange={(e) => setTax(e.target.value)} />
+        </Field>
+        <Field label="Envío">
+          <Input type="number" min={0} value={shipping} onChange={(e) => setShipping(e.target.value)} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Válida hasta (opcional)">
+          <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+        </Field>
+        <Field label="Notas (opcional)">
+          <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Guardando…" : "Guardar cambios"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
   );
 }
 
