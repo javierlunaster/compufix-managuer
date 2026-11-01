@@ -64,6 +64,22 @@ export class DocumentsService {
     }
   }
 
+  /**
+   * Texto de garantía de un artículo (repuesto vendido o instalado) para
+   * imprimir en un documento — mismo cálculo que WarrantiesService.create
+   * (fecha de referencia + Product.warrantyMonths). Sin warrantyMonths
+   * configurado en el catálogo, sale "Sin garantía" en vez de inventar un
+   * plazo (ver generateSaleReceipt/generateDeliveryReceipt).
+   */
+  private warrantyLabel(months: number | null | undefined, fromDate: Date): string {
+    if (!months || months <= 0) {
+      return "Sin garantía";
+    }
+    const warrantyEndDate = new Date(fromDate);
+    warrantyEndDate.setMonth(warrantyEndDate.getMonth() + months);
+    return `${months} ${months === 1 ? "mes" : "meses"} (vence ${formatDate(warrantyEndDate)})`;
+  }
+
   private async buildPhotoGridEntries(
     photos: { fileUrl: string; uploadedAt: Date }[],
   ): Promise<{ path: Buffer | null; caption: string }[]> {
@@ -334,10 +350,19 @@ export class DocumentsService {
         pdf.paragraph(note);
       }
       if (order.partsUsed.length > 0) {
+        // La garantía del repuesto se cuenta desde la entrega (cuando el
+        // cliente de verdad recibe el equipo con la pieza instalada), no
+        // desde que se registró el repuesto en la orden — mismo criterio
+        // que generateSaleReceipt con la fecha de la venta.
+        const warrantyFromDate = order.deliveryDate ?? new Date();
         pdf.table(
-          ["Repuesto utilizado", "Cantidad"],
-          order.partsUsed.map((p) => [p.product.description, String(p.quantity)]),
-          [340, 100],
+          ["Repuesto utilizado", "Cantidad", "Garantía"],
+          order.partsUsed.map((p) => [
+            p.product.description,
+            String(p.quantity),
+            this.warrantyLabel(p.product.warrantyMonths, warrantyFromDate),
+          ]),
+          [220, 70, 150],
         );
       }
       if (order.servicesUsed.length > 0) {
@@ -597,22 +622,13 @@ export class DocumentsService {
     pdf.sectionTitle("Artículos comprados");
     pdf.table(
       ["Producto", "Cant.", "Precio unit.", "Subtotal", "Garantía"],
-      sale.items.map((item) => {
-        const months = item.product.warrantyMonths;
-        let warrantyText = "Sin garantía";
-        if (months && months > 0) {
-          const warrantyEndDate = new Date(sale.date);
-          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + months);
-          warrantyText = `${months} ${months === 1 ? "mes" : "meses"} (vence ${formatDate(warrantyEndDate)})`;
-        }
-        return [
-          item.product.description,
-          String(item.quantity),
-          formatCurrency(item.unitPrice),
-          formatCurrency(item.subtotal),
-          warrantyText,
-        ];
-      }),
+      sale.items.map((item) => [
+        item.product.description,
+        String(item.quantity),
+        formatCurrency(item.unitPrice),
+        formatCurrency(item.subtotal),
+        this.warrantyLabel(item.product.warrantyMonths, sale.date),
+      ]),
       [140, 40, 80, 80, 150],
     );
 

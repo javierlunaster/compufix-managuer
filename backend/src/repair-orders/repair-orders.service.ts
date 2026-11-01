@@ -53,7 +53,9 @@ const ORDER_DETAIL_INCLUDE = {
     },
   },
   partsUsed: {
-    include: { product: { select: { id: true, sku: true, description: true } } },
+    include: {
+      product: { select: { id: true, sku: true, description: true, warrantyMonths: true } },
+    },
   },
   servicesUsed: {
     include: { service: { select: { id: true, code: true, name: true } } },
