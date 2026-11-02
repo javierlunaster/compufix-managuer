@@ -58,7 +58,7 @@ const ORDER_DETAIL_INCLUDE = {
     },
   },
   servicesUsed: {
-    include: { service: { select: { id: true, code: true, name: true } } },
+    include: { service: { select: { id: true, code: true, name: true, warrantyMonths: true } } },
   },
   quotations: {
     select: { id: true, quotationNumber: true, status: true, total: true },

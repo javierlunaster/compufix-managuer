@@ -173,10 +173,20 @@ export class DocumentsService {
     }
 
     if (order.partsUsed.length > 0) {
+      // El informe técnico se puede generar antes de la entrega (la orden
+      // todavía puede estar "En reparación") — se usa la fecha de entrega
+      // si ya se fijó, igual que el comprobante de entrega; si no, hoy,
+      // como una proyección de cuándo empezaría a correr la garantía.
+      const warrantyFromDate = order.deliveryDate ?? new Date();
       pdf.sectionTitle("Repuestos utilizados");
       pdf.table(
-        ["Producto", "Cantidad", "Precio"],
-        order.partsUsed.map((p) => [p.product.description, String(p.quantity), formatCurrency(p.unitPrice)]),
+        ["Producto", "Cantidad", "Precio", "Garantía"],
+        order.partsUsed.map((p) => [
+          p.product.description,
+          String(p.quantity),
+          formatCurrency(p.unitPrice),
+          this.warrantyLabel(p.product.warrantyMonths, warrantyFromDate),
+        ]),
       );
     }
 
@@ -349,12 +359,13 @@ export class DocumentsService {
       for (const note of diagnosisNotes) {
         pdf.paragraph(note);
       }
+      // La garantía de repuestos y servicios se cuenta desde la entrega
+      // (cuando el cliente de verdad recibe el equipo con el trabajo ya
+      // instalado/realizado), no desde que se registró la fila en la
+      // orden — mismo criterio que generateSaleReceipt con la fecha de la
+      // venta.
+      const warrantyFromDate = order.deliveryDate ?? new Date();
       if (order.partsUsed.length > 0) {
-        // La garantía del repuesto se cuenta desde la entrega (cuando el
-        // cliente de verdad recibe el equipo con la pieza instalada), no
-        // desde que se registró el repuesto en la orden — mismo criterio
-        // que generateSaleReceipt con la fecha de la venta.
-        const warrantyFromDate = order.deliveryDate ?? new Date();
         pdf.table(
           ["Repuesto utilizado", "Cantidad", "Garantía"],
           order.partsUsed.map((p) => [
@@ -367,12 +378,18 @@ export class DocumentsService {
       }
       if (order.servicesUsed.length > 0) {
         pdf.table(
-          ["Servicio realizado", "Valor"],
+          ["Servicio realizado", "Valor", "Garantía"],
           // description siempre está poblado para registros nuevos (ver
           // RepairServicesService.createWithTx); el fallback a
-          // service?.name cubre filas creadas antes de esa migración.
-          order.servicesUsed.map((s) => [s.description ?? s.service?.name ?? "Servicio", formatCurrency(s.price)]),
-          [340, 100],
+          // service?.name cubre filas creadas antes de esa migración. Un
+          // servicio de mano de obra sin catálogo (service null) no tiene
+          // de dónde sacar warrantyMonths, así que sale "Sin garantía".
+          order.servicesUsed.map((s) => [
+            s.description ?? s.service?.name ?? "Servicio",
+            formatCurrency(s.price),
+            this.warrantyLabel(s.service?.warrantyMonths, warrantyFromDate),
+          ]),
+          [230, 90, 120],
         );
       }
     }
