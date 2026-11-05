@@ -46,6 +46,8 @@ import { DeviceDetailPage } from "@/pages/DeviceDetailPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { CatalogPage } from "@/pages/CatalogPage";
 import { FinancePage } from "@/pages/FinancePage";
+import { ScrapBoardsPage } from "@/pages/ScrapBoardsPage";
+import { ScrapBoardDetailPage } from "@/pages/ScrapBoardDetailPage";
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -162,6 +164,8 @@ function AppRoutes() {
       <Route path="/account" element={<ProtectedLayout><AccountPage /></ProtectedLayout>} />
       <Route path="/settings" element={<ProtectedLayout><SettingsPage /></ProtectedLayout>} />
       <Route path="/devices/:id" element={<ProtectedLayout><DeviceDetailPage /></ProtectedLayout>} />
+      <Route path="/scrap-boards" element={<ProtectedLayout><ScrapBoardsPage /></ProtectedLayout>} />
+      <Route path="/scrap-boards/:id" element={<ProtectedLayout><ScrapBoardDetailPage /></ProtectedLayout>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

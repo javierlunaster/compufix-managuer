@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/sales", label: "Ventas", icon: CartIcon },
   { to: "/purchases", label: "Compras", icon: TruckIcon },
   { to: "/service-jobs", label: "Servicios externos", icon: BriefcaseIcon },
+  { to: "/scrap-boards", label: "Placas SCRAP", icon: ChipIcon },
   { to: "/cash", label: "Caja", icon: CashIcon },
   { to: "/finance", label: "Finanzas", icon: ChartIcon, roles: ["Administrador", "Gerente"] },
   // El backend restringe toda la gestión de usuarios a Administrador
@@ -278,6 +279,15 @@ function BriefcaseIcon({ className }: { className?: string }) {
       <rect x="3" y="7" width="18" height="13" rx="2" />
       <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <path d="M3 12h18" />
+    </svg>
+  );
+}
+
+function ChipIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <rect x="6" y="6" width="12" height="12" rx="1" />
+      <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" />
     </svg>
   );
 }

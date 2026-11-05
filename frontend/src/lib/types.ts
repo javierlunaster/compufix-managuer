@@ -174,6 +174,68 @@ export type Attachment = {
   uploadedBy: { id: number; fullName: string };
 };
 
+// Inventario de placas base de SCRAP (ver scrap-boards/ en el backend) —
+// placas donadas/desechadas que se conservan solo como fuente de
+// componentes para reparar OTRAS placas.
+export type ScrapComponentStatus = "AVAILABLE" | "REMOVED";
+
+export const SCRAP_COMPONENT_STATUS_LABELS: Record<ScrapComponentStatus, string> = {
+  AVAILABLE: "Disponible",
+  REMOVED: "Usado",
+};
+
+export type ScrapComponent = {
+  id: number;
+  scrapBoardId: number;
+  designator: string;
+  reference: string;
+  description?: string | null;
+  quantity: number;
+  status: ScrapComponentStatus;
+  removedAt?: string | null;
+  createdAt: string;
+};
+
+export type ScrapBoardFile = {
+  id: number;
+  fileUrl: string;
+  fileType: string;
+  category: string;
+  description?: string | null;
+  uploadedAt: string;
+  uploadedBy: { id: number; fullName: string };
+};
+
+export type ScrapBoardListItem = {
+  id: number;
+  code: string;
+  model: string;
+  location?: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  brand?: { id: number; name: string } | null;
+  deviceType?: { id: number; name: string } | null;
+  _count: { components: number };
+};
+
+export type ScrapBoardDetail = Omit<ScrapBoardListItem, "_count"> & {
+  notes?: string | null;
+  components: ScrapComponent[];
+  files: ScrapBoardFile[];
+};
+
+export type ScrapComponentSearchResult = ScrapComponent & {
+  scrapBoard: {
+    id: number;
+    code: string;
+    model: string;
+    location?: string | null;
+    status: "ACTIVE" | "INACTIVE";
+    brand?: { id: number; name: string } | null;
+    deviceType?: { id: number; name: string } | null;
+  };
+};
+
 export type RepairLogEntry = {
   id: number;
   date: string;

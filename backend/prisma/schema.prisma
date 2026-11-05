@@ -176,6 +176,7 @@ model User {
   auditLogs              AuditLog[]
   attachmentsUploaded    Attachment[]
   hardwareTestsPerformed HardwareTestResult[]
+  scrapBoardFilesUploaded ScrapBoardFile[]
 
   @@map("users")
 }
@@ -261,7 +262,8 @@ model DeviceType {
   name   String       @unique // Portátil, Torre, All in One, Tablet, Placa base, Impresora...
   status RecordStatus @default(ACTIVE)
 
-  devices Device[]
+  devices     Device[]
+  scrapBoards ScrapBoard[]
 
   @@map("device_types")
 }
@@ -271,8 +273,9 @@ model Brand {
   name   String       @unique
   status RecordStatus @default(ACTIVE)
 
-  devices  Device[]
-  products Product[]
+  devices     Device[]
+  products    Product[]
+  scrapBoards ScrapBoard[]
 
   @@map("brands")
 }
@@ -1176,7 +1179,94 @@ model Attachment {
 }
 
 // -----------------------------------------------------------------------------
-// 18. TRAZABILIDAD
+// 18. INVENTARIO DE PLACAS SCRAP
+// -----------------------------------------------------------------------------
+// Placas base donadas/desechadas que se conservan solo como fuente de
+// componentes (IC, MOSFET, conectores...) para reparar OTRAS placas — no
+// es inventario para la venta (ver Product/ProductCategory arriba), es
+// soporte técnico interno. El problema real que resuelve: antes de esto,
+// encontrar si algún componente ya disponible en SCRAP sirve para una
+// reparación tomaba horas de revisar placa por placa a mano.
+
+model ScrapBoard {
+  id Int @id @default(autoincrement())
+
+  // Igual patrón que RepairOrder.orderCode: se crea con un valor temporal
+  // y se corrige a "PB" + id dentro de la misma transacción — pensado para
+  // escribirse en un sticker físico pegado a la placa, así el resultado de
+  // una búsqueda de componente dice exactamente qué placa física tomar.
+  code String @unique
+
+  // Modelo real de la placa (ej. "DA0ZAUMB8E0"), no el modelo comercial del
+  // equipo — ese dato vive en marca/tipo de equipo, abajo, por separado.
+  model String
+
+  brandId      Int?
+  brand        Brand?      @relation(fields: [brandId], references: [id])
+  deviceTypeId Int?
+  deviceType   DeviceType? @relation(fields: [deviceTypeId], references: [id])
+
+  // Ubicación física libre (ej. "Estante 3 - Caja B") — mismo criterio que
+  // Product.location: no se modela como catálogo aparte a propósito.
+  location String?
+  notes    String?
+
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+
+  components ScrapComponent[]
+  files      ScrapBoardFile[]
+
+  @@map("scrap_boards")
+}
+
+enum ScrapComponentStatus {
+  AVAILABLE
+  REMOVED // ya se extrajo/usó de esta placa — nunca se borra la fila (Regla 1), queda como historial
+}
+
+model ScrapComponent {
+  id           Int        @id @default(autoincrement())
+  scrapBoardId Int
+  scrapBoard   ScrapBoard @relation(fields: [scrapBoardId], references: [id])
+
+  // Designador de serigrafía impreso en la placa junto al componente
+  // (ej. "U4", "Q12", "IC3") — lo que el brief llama "cirgrafía".
+  designator String
+
+  // Referencia/marcación real del componente (ej. "BQ24780S") — el otro
+  // criterio de búsqueda, independiente del designador.
+  reference   String
+  description String?
+  quantity    Int                  @default(1)
+  status      ScrapComponentStatus @default(AVAILABLE)
+  removedAt   DateTime?
+  createdAt   DateTime             @default(now())
+
+  @@map("scrap_components")
+}
+
+model ScrapBoardFile {
+  id           Int        @id @default(autoincrement())
+  scrapBoardId Int
+  scrapBoard   ScrapBoard @relation(fields: [scrapBoardId], references: [id])
+
+  fileUrl String
+  fileType String // image/jpeg, application/pdf, application/octet-stream (boardview)...
+  // foto | esquematico | boardview — para agrupar en la UI, igual criterio
+  // que Attachment.category.
+  category    String
+  description String?
+
+  uploadedById Int
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now())
+
+  @@map("scrap_board_files")
+}
+
+// -----------------------------------------------------------------------------
+// 19. TRAZABILIDAD
 // -----------------------------------------------------------------------------
 
 model AuditLog {
