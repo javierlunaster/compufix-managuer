@@ -1,13 +1,42 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import * as XLSX from "xlsx";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { StorageService } from "../storage/storage.service";
+import { normalizeName } from "../common/utils/normalize-name.util";
 import { CreateScrapBoardDto } from "./dto/create-scrap-board.dto";
 import { UpdateScrapBoardDto } from "./dto/update-scrap-board.dto";
 import { CreateScrapComponentDto } from "./dto/create-scrap-component.dto";
 import { UpdateScrapComponentDto } from "./dto/update-scrap-component.dto";
 import { UploadScrapBoardFileDto } from "./dto/upload-scrap-board-file.dto";
+
+interface ImportRowIssue {
+  row: number;
+  message: string;
+}
+
+export interface ImportComponentsResult {
+  imported: number;
+  errors: ImportRowIssue[];
+}
+
+// Alias aceptados por columna — normalizados (sin tildes, minúsculas) al
+// comparar, así que "Designador", "designador" o "DESIGNADOR" calzan
+// igual. Varias formas de escribir lo mismo porque este archivo lo llena
+// a mano cada técnico, no un sistema que siempre use el mismo encabezado.
+const HEADER_ALIASES = {
+  designator: ["designador", "designator", "cirgrafia", "serigrafia"],
+  reference: ["referencia", "reference"],
+  description: ["descripcion", "description"],
+  quantity: ["cantidad", "quantity", "cant"],
+} as const;
+
+function cellToNonEmptyString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s === "" ? null : s;
+}
 
 const BOARD_DETAIL_INCLUDE = {
   brand: true,
@@ -198,6 +227,118 @@ export class ScrapBoardsService {
     });
 
     return this.findOne(boardId);
+  }
+
+  /**
+   * Carga masiva de componentes desde un CSV/Excel — pensado para cuando
+   * el listado de componentes de una placa viene de otra fuente (un
+   * esquemático/boardview que el técnico ya revisó aparte, o simplemente
+   * se armó la lista completa en una hoja de cálculo antes de cargarla
+   * aquí) en vez de capturarlo fila por fila en el formulario. No valida
+   * contra el resto del sistema (a diferencia de ImportService, que
+   * fusiona clientes/equipos): cada fila es independiente, así que un
+   * error en una fila no bloquea las demás.
+   */
+  async importComponentsCsv(
+    boardId: number,
+    file: { buffer: Buffer; originalname: string; mimetype: string },
+    actingUserId: number,
+  ): Promise<ImportComponentsResult> {
+    await this.findOne(boardId);
+
+    // Un .xlsx/.xls es un ZIP con XML en UTF-8 — SheetJS lo decodifica
+    // bien directo del buffer. Un .csv es texto plano sin codificación
+    // declarada, y SheetJS asume Latin-1 si se le pasa el buffer crudo,
+    // dejando cualquier encabezado con tilde (ej. "Descripción")
+    // convertido en basura silenciosa ("DescripciÃ³n") que nunca calza
+    // con HEADER_ALIASES. Decodificar el buffer como UTF-8 a mano antes
+    // de pasárselo a XLSX (como texto, no como buffer) evita que SheetJS
+    // adivine mal la codificación.
+    const isCsv = /\.csv$/i.test(file.originalname) || file.mimetype === "text/csv";
+    const workbook = isCsv
+      ? XLSX.read(file.buffer.toString("utf-8"), { type: "string" })
+      : XLSX.read(file.buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) {
+      throw new BadRequestException("El archivo no tiene ninguna hoja con datos");
+    }
+
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+    if (rows.length === 0) {
+      throw new BadRequestException(
+        "El archivo no tiene filas de datos — revisa que la primera fila traiga los encabezados " +
+          "(Designador, Referencia, Descripción, Cantidad) y que haya al menos una fila debajo",
+      );
+    }
+
+    // Encabezados reales del archivo → a cuál columna esperada corresponde
+    // cada uno, comparando normalizado (ver HEADER_ALIASES arriba).
+    const actualHeaders = Object.keys(rows[0]);
+    const headerFor = (field: keyof typeof HEADER_ALIASES) =>
+      actualHeaders.find((h) => (HEADER_ALIASES[field] as readonly string[]).includes(normalizeName(h)));
+
+    const designatorHeader = headerFor("designator");
+    const referenceHeader = headerFor("reference");
+    if (!designatorHeader || !referenceHeader) {
+      throw new BadRequestException(
+        "El archivo debe tener al menos las columnas 'Designador' y 'Referencia' " +
+          "('Descripción' y 'Cantidad' son opcionales)",
+      );
+    }
+    const descriptionHeader = headerFor("description");
+    const quantityHeader = headerFor("quantity");
+
+    const errors: ImportRowIssue[] = [];
+    const toCreate: { designator: string; reference: string; description: string | null; quantity: number }[] = [];
+
+    rows.forEach((row, i) => {
+      const excelRow = i + 2; // fila 1 = encabezados
+      if (Object.values(row).every((c) => c === null || String(c).trim() === "")) {
+        return; // fila totalmente vacía, se ignora en silencio
+      }
+
+      const designator = String(row[designatorHeader] ?? "").trim();
+      const reference = String(row[referenceHeader] ?? "").trim();
+      if (!designator || !reference) {
+        errors.push({ row: excelRow, message: "Falta Designador o Referencia — fila omitida" });
+        return;
+      }
+
+      const description = descriptionHeader
+        ? cellToNonEmptyString(row[descriptionHeader])
+        : null;
+
+      let quantity = 1;
+      if (quantityHeader && row[quantityHeader] !== null) {
+        const parsed = Number(row[quantityHeader]);
+        if (!Number.isInteger(parsed) || parsed < 1) {
+          errors.push({
+            row: excelRow,
+            message: `Cantidad inválida "${row[quantityHeader]}" — se importó con cantidad 1`,
+          });
+        } else {
+          quantity = parsed;
+        }
+      }
+
+      toCreate.push({ designator, reference, description, quantity });
+    });
+
+    if (toCreate.length > 0) {
+      await this.prisma.scrapComponent.createMany({
+        data: toCreate.map((c) => ({ ...c, scrapBoardId: boardId })),
+      });
+    }
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "IMPORT_COMPONENTS",
+      entityType: "ScrapBoard",
+      entityId: boardId,
+      newValue: { imported: toCreate.length, errors: errors.length },
+    });
+
+    return { imported: toCreate.length, errors };
   }
 
   private async ensureComponentBelongsToBoard(boardId: number, componentId: number) {

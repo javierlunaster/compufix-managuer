@@ -224,6 +224,11 @@ export type ScrapBoardDetail = Omit<ScrapBoardListItem, "_count"> & {
   files: ScrapBoardFile[];
 };
 
+export type ImportComponentsResult = {
+  imported: number;
+  errors: { row: number; message: string }[];
+};
+
 export type ScrapComponentSearchResult = ScrapComponent & {
   scrapBoard: {
     id: number;

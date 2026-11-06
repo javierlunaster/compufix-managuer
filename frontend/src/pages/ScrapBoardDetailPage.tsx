@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { Brand, DeviceTypeCatalog, ScrapBoardDetail, ScrapComponent } from "@/lib/types";
+import type {
+  Brand,
+  DeviceTypeCatalog,
+  ImportComponentsResult,
+  ScrapBoardDetail,
+  ScrapComponent,
+} from "@/lib/types";
 import { SCRAP_COMPONENT_STATUS_LABELS } from "@/lib/types";
 import { ScrapBoardFiles } from "@/components/ScrapBoardFiles";
 import {
@@ -50,7 +56,12 @@ export function ScrapBoardDetailPage() {
     }
   }
 
-  if (loading) {
+  // Solo se muestra el spinner de página completa en la carga inicial
+  // (sin !board, cada reload() — ej. tras importar componentes — volvía
+  // a desmontar toda la pantalla y perdía el resumen de la importación
+  // que se acababa de mostrar justo antes de que el usuario llegara a
+  // leerlo).
+  if (loading && !board) {
     return (
       <div className="flex justify-center py-10">
         <Spinner />
@@ -236,6 +247,7 @@ function EditScrapBoardForm({
 
 function ComponentsCard({ board, onChanged }: { board: ScrapBoardDetail; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -287,14 +299,29 @@ function ComponentsCard({ board, onChanged }: { board: ScrapBoardDetail; onChang
         title="Componentes"
         subtitle="IC y componentes electrónicos disponibles en esta placa"
         action={
-          <Button variant="secondary" onClick={() => setAdding((a) => !a)}>
-            {adding ? "Cancelar" : "+ Agregar componente"}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setImporting((i) => !i)}>
+              {importing ? "Cancelar" : "Importar CSV"}
+            </Button>
+            <Button variant="secondary" onClick={() => setAdding((a) => !a)}>
+              {adding ? "Cancelar" : "+ Agregar componente"}
+            </Button>
+          </div>
         }
       />
       {error && (
         <div className="p-4 pb-0">
           <ErrorBanner message={error} />
+        </div>
+      )}
+      {importing && (
+        <div className="border-b border-border p-4">
+          <ImportComponentsForm
+            boardId={board.id}
+            onImported={() => {
+              onChanged();
+            }}
+          />
         </div>
       )}
       {adding && (
@@ -435,5 +462,92 @@ function NewComponentForm({ boardId, onAdded }: { boardId: number; onAdded: () =
         {saving ? "Agregando…" : "Agregar"}
       </Button>
     </form>
+  );
+}
+
+const CSV_TEMPLATE =
+  "data:text/csv;charset=utf-8," +
+  encodeURIComponent("Designador,Referencia,Descripcion,Cantidad\nU4,BQ24780S,IC de carga,1\n");
+
+/**
+ * Carga masiva de componentes desde un CSV/Excel (ver
+ * ScrapBoardsService.importComponentsCsv) — para cuando el listado ya
+ * viene armado en una hoja de cálculo (ej. a partir de un esquemático o
+ * boardview revisado aparte) en vez de capturarlo fila por fila.
+ */
+function ImportComponentsForm({ boardId, onImported }: { boardId: number; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ImportComponentsResult | null>(null);
+
+  async function handleImport() {
+    if (!file) return;
+    setError(null);
+    setResult(null);
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const data = await api.postForm<ImportComponentsResult>(
+        `/scrap-boards/${boardId}/components/import`,
+        formData,
+      );
+      setResult(data);
+      setFile(null);
+      onImported();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo importar el archivo");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-ink-muted">
+        Columnas esperadas: <span className="font-mono text-xs">Designador</span>,{" "}
+        <span className="font-mono text-xs">Referencia</span> (obligatorias),{" "}
+        <span className="font-mono text-xs">Descripcion</span> y{" "}
+        <span className="font-mono text-xs">Cantidad</span> (opcionales).{" "}
+        <a href={CSV_TEMPLATE} download="plantilla_componentes.csv" className="text-accent hover:underline">
+          Descargar plantilla
+        </a>
+      </p>
+
+      {error && <ErrorBanner message={error} />}
+
+      {result && (
+        <div className="rounded border border-border bg-surface-raised p-3 text-sm">
+          <p className={result.imported > 0 ? "text-success" : "text-ink-muted"}>
+            {result.imported} componente{result.imported === 1 ? "" : "s"} importado
+            {result.imported === 1 ? "" : "s"}.
+          </p>
+          {result.errors.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-warning">
+              {result.errors.map((e, i) => (
+                <li key={i}>
+                  Fila {e.row}: {e.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="text-xs text-ink-muted file:mr-2 file:rounded file:border file:border-border file:bg-surface-raised file:px-2 file:py-1 file:text-xs file:text-ink"
+        />
+        {file && (
+          <Button type="button" variant="primary" onClick={handleImport} disabled={importing}>
+            {importing ? "Importando…" : "Importar"}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

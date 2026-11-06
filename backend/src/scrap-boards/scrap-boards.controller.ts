@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,10 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from "@nestjs/common";
-import { FilesInterceptor } from "@nestjs/platform-express";
+import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
 import { ScrapBoardsService } from "./scrap-boards.service";
 import { CreateScrapBoardDto } from "./dto/create-scrap-board.dto";
 import { UpdateScrapBoardDto } from "./dto/update-scrap-board.dto";
@@ -82,6 +84,19 @@ export class ScrapBoardsController {
   @Patch("scrap-boards/:id/reactivate")
   reactivate(@Param("id", ParseIntPipe) id: number, @CurrentUser() actingUser: AuthenticatedUser) {
     return this.scrapBoardsService.reactivate(id, actingUser.id);
+  }
+
+  @Post("scrap-boards/:id/components/import")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }))
+  importComponents(
+    @Param("id", ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException("Sube el archivo CSV/Excel en el campo 'file' (multipart/form-data)");
+    }
+    return this.scrapBoardsService.importComponentsCsv(id, file, actingUser.id);
   }
 
   @Post("scrap-boards/:id/components")
