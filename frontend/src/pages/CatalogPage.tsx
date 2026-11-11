@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { BRAND } from "@/lib/branding";
 import { api, resolvePhotoUrl } from "@/lib/api";
@@ -169,7 +169,21 @@ export function CatalogPage() {
 }
 
 function ProductCard({ product }: { product: PublicProduct }) {
-  const photo = product.photos[0];
+  const photos = product.photos;
+  const [index, setIndex] = useState(0);
+  const photo = photos[index];
+
+  function showPrev(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIndex((i) => (i - 1 + photos.length) % photos.length);
+  }
+  function showNext(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIndex((i) => (i + 1) % photos.length);
+  }
+
   return (
     <article className="product-card">
       <div className="product-photo">
@@ -179,6 +193,41 @@ function ProductCard({ product }: { product: PublicProduct }) {
           <div className="product-photo-placeholder" aria-hidden="true">
             <PlaceholderIcon />
           </div>
+        )}
+        {photos.length > 1 && (
+          <>
+            <button
+              type="button"
+              className="photo-nav photo-nav-prev"
+              onClick={showPrev}
+              aria-label="Foto anterior"
+            >
+              <ChevronIcon direction="left" />
+            </button>
+            <button
+              type="button"
+              className="photo-nav photo-nav-next"
+              onClick={showNext}
+              aria-label="Foto siguiente"
+            >
+              <ChevronIcon direction="right" />
+            </button>
+            <div className="photo-dots">
+              {photos.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`photo-dot ${i === index ? "active" : ""}`}
+                  aria-label={`Ver foto ${i + 1} de ${photos.length}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIndex(i);
+                  }}
+                />
+              ))}
+            </div>
+          </>
         )}
         <span className={`stock-badge ${product.inStock ? "in-stock" : "out-of-stock"}`}>
           {product.inStock ? "Disponible" : "Agotado"}
@@ -211,6 +260,14 @@ function PlaceholderIcon() {
       <path d="M21 8l-9-5-9 5 9 5 9-5z" />
       <path d="M3 8v8l9 5 9-5V8" />
       <path d="M12 13v8" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d={direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
     </svg>
   );
 }
