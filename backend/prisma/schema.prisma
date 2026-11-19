@@ -500,6 +500,13 @@ model Sale {
   subtotal      Decimal       @db.Decimal(12, 2)
   discount      Decimal       @default(0) @db.Decimal(12, 2)
   total         Decimal       @db.Decimal(12, 2)
+  // Cuánto ha pagado el cliente hasta ahora — igual que
+  // RepairOrder.paidAmount, el saldo pendiente se calcula al vuelo como
+  // total - paidAmount, nunca se almacena. Al crear la venta normalmente
+  // queda en `total` (venta de mostrador, pagada de una vez), pero puede
+  // quedar por debajo si el cliente paga una parte y debe el resto (ver
+  // SalesService.create/PaymentsService.create).
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
   paymentMethod PaymentMethod
   status        RecordStatus  @default(ACTIVE)
 

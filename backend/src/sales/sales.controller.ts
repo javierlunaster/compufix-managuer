@@ -20,6 +20,13 @@ export class SalesController {
     });
   }
 
+  // Antes de ":id" por la misma razón que en ScrapBoardsController: si no,
+  // Nest intentaría interpretar "pending" como un id de venta.
+  @Get("pending")
+  findPending() {
+    return this.salesService.findPending();
+  }
+
   @Get(":id")
   findOne(@Param("id", ParseIntPipe) id: number) {
     return this.salesService.findOne(id);

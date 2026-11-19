@@ -339,38 +339,52 @@ export class CashService {
   }
 
   /**
-   * Reversa el ingreso de una venta cancelada (ver SalesService.cancel) —
-   * un egreso por el mismo monto, marcado con el mismo `saleId` para que
-   * FinanceService lo excluya igual que el ingreso original (no es un
-   * gasto real, es una corrección del arqueo de caja). Busca la caja
-   * donde se registró ESE ingreso específico: si ya se cerró, no se toca
-   * — el arqueo de una caja cerrada es un snapshot congelado, no se
-   * corrige retroactivamente, igual que el resto del sistema no permite
-   * editar historia ya cerrada.
+   * Reversa el/los ingreso(s) de una venta cancelada (ver
+   * SalesService.cancel) — un egreso por cada uno, marcado con el mismo
+   * `saleId` para que FinanceService lo excluya igual que el ingreso
+   * original (no es un gasto real, es una corrección del arqueo de
+   * caja). Una venta con saldo pendiente puede tener más de un ingreso
+   * de caja: el inicial (tagueado con `saleId` directo, ver
+   * SalesService.create) y uno por cada abono posterior que se le haya
+   * registrado (tagueado con `paymentId`, ver PaymentsService.create) —
+   * por eso `paymentIds` además de `saleId`. Cada uno se reversa en SU
+   * PROPIA caja de origen, y solo si esa caja sigue abierta: si ya se
+   * cerró, no se toca — el arqueo de un día cerrado es un snapshot
+   * congelado, no se corrige retroactivamente, igual que el resto del
+   * sistema no permite editar historia ya cerrada.
    */
   async reverseSaleIncomeIfStillOpen(
     tx: PrismaTxClient,
-    params: { saleId: number; amount: number; userId: number; description?: string },
+    params: { saleId: number; paymentIds: number[]; userId: number; description?: string },
   ) {
-    const originalMovement = await tx.cashMovement.findFirst({
-      where: { saleId: params.saleId, type: CashMovementType.INCOME },
+    const originalMovements = await tx.cashMovement.findMany({
+      where: {
+        type: CashMovementType.INCOME,
+        OR: [{ saleId: params.saleId }, { paymentId: { in: params.paymentIds } }],
+      },
       include: { cashRegister: true },
     });
-    if (!originalMovement || originalMovement.cashRegister.status !== "OPEN") {
-      return null;
-    }
 
-    return tx.cashMovement.create({
-      data: {
-        cashRegisterId: originalMovement.cashRegisterId,
-        type: CashMovementType.EXPENSE,
-        category: "Venta cancelada",
-        amount: params.amount,
-        saleId: params.saleId,
-        description: params.description,
-        userId: params.userId,
-      },
-    });
+    const reversed = [];
+    for (const movement of originalMovements) {
+      if (movement.cashRegister.status !== "OPEN") {
+        continue;
+      }
+      reversed.push(
+        await tx.cashMovement.create({
+          data: {
+            cashRegisterId: movement.cashRegisterId,
+            type: CashMovementType.EXPENSE,
+            category: "Venta cancelada",
+            amount: movement.amount,
+            saleId: params.saleId,
+            description: params.description,
+            userId: params.userId,
+          },
+        }),
+      );
+    }
+    return reversed;
   }
 
   /**

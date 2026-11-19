@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InventoryMovementType, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -61,6 +61,22 @@ export class SalesService {
     );
     const total = subtotal - (dto.discount ?? 0);
 
+    // Si no se indica cuánto paga ahora, se asume el total — el caso
+    // normal de venta de mostrador pagada de contado. Si paga menos,
+    // queda saldo pendiente a cargo de un cliente real (no se puede
+    // fiar una venta anónima: no habría a quién cobrarle después).
+    const paidAmount = dto.amountPaid ?? total;
+    if (paidAmount > total) {
+      throw new BadRequestException(
+        "El pago inicial no puede ser mayor al total de la venta",
+      );
+    }
+    if (paidAmount < total && !dto.customerId) {
+      throw new BadRequestException(
+        "Una venta con saldo pendiente requiere un cliente registrado, para poder cobrarle el resto después",
+      );
+    }
+
     const sale = await this.prisma.$transaction(async (tx) => {
       const created = await tx.sale.create({
         data: {
@@ -70,6 +86,7 @@ export class SalesService {
           subtotal,
           discount: dto.discount ?? 0,
           total,
+          paidAmount,
           paymentMethod: dto.paymentMethod,
         },
       });
@@ -96,19 +113,22 @@ export class SalesService {
         });
       }
 
-      // Se registra como ya cobrada en el momento (sección 15 del brief —
-      // venta rápida tipo POS, sin saldo pendiente que rastrear), así que
-      // el ingreso de caja se refleja aquí mismo en vez de esperar un
-      // Payment aparte — mismo mecanismo que ya usan los abonos (ver
-      // CashService.recordIncomeIfRegisterOpen), solo que con saleId en
-      // vez de paymentId.
-      await this.cash.recordIncomeIfRegisterOpen(tx, {
-        category: "Ventas",
-        amount: total,
-        saleId: created.id,
-        userId: actingUserId,
-        description: `Venta${dto.customerId ? "" : " de mostrador"} #${created.id}`,
-      });
+      // El ingreso de caja es por lo que de verdad entra ahora
+      // (paidAmount), no por el total facturado — si la venta queda con
+      // saldo pendiente, ese resto entra después como un Payment normal
+      // (ver PaymentsService.create, rama saleId) y cuenta en Caja en su
+      // propio momento, no aquí. Mismo mecanismo que ya usan los abonos
+      // (ver CashService.recordIncomeIfRegisterOpen), solo que con saleId
+      // en vez de paymentId para este ingreso inicial.
+      if (paidAmount > 0) {
+        await this.cash.recordIncomeIfRegisterOpen(tx, {
+          category: "Ventas",
+          amount: paidAmount,
+          saleId: created.id,
+          userId: actingUserId,
+          description: `Venta${dto.customerId ? "" : " de mostrador"} #${created.id}`,
+        });
+      }
 
       return created;
     });
@@ -144,6 +164,29 @@ export class SalesService {
     });
   }
 
+  /**
+   * Ventas activas con saldo pendiente (sección pedida: "seguimiento a
+   * las ventas con saldo pendiente por pagar") — no se puede comparar
+   * paidAmount vs total directo en el where de Prisma (son dos columnas
+   * de la misma fila), así que se trae todo lo activo y se filtra acá.
+   * El volumen esperado para un taller es bajo, mismo criterio pragmático
+   * que el resto del sistema (ver los `take` fijos en otros findAll).
+   */
+  async findPending() {
+    const sales = await this.prisma.sale.findMany({
+      where: { status: "ACTIVE" },
+      include: {
+        customer: { select: { id: true, fullName: true, phone: true } },
+        seller: { select: { id: true, fullName: true } },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    return sales
+      .map((s) => ({ ...s, balance: new Prisma.Decimal(s.total).minus(s.paidAmount) }))
+      .filter((s) => s.balance.greaterThan(0));
+  }
+
   async findOne(id: number) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
@@ -169,7 +212,7 @@ export class SalesService {
   async cancel(id: number, actingUserId: number) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
-      include: { items: true },
+      include: { items: true, payments: { select: { id: true } } },
     });
     if (!sale) {
       throw new NotFoundException("Venta no encontrada");
@@ -190,9 +233,14 @@ export class SalesService {
         });
       }
 
+      // Reversa el ingreso inicial (tagueado con saleId) y el de cada
+      // abono posterior que se le haya registrado a esta venta (tagueados
+      // con paymentId) — una venta con saldo pendiente puede tener varios
+      // ingresos de caja repartidos en días distintos, no solo el de la
+      // creación.
       await this.cash.reverseSaleIncomeIfStillOpen(tx, {
         saleId: id,
-        amount: Number(sale.total),
+        paymentIds: sale.payments.map((p) => p.id),
         userId: actingUserId,
         description: `Reversión de venta #${id} cancelada`,
       });

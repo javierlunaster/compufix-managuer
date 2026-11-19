@@ -35,4 +35,14 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   invoiceNumber?: string;
+
+  // Cuánto paga el cliente en este momento — si se omite, se asume la
+  // venta completa (el caso normal, venta de mostrador pagada de una
+  // vez). Si es menor al total, la venta queda con saldo pendiente (ver
+  // SalesService.create) y por eso requiere un cliente registrado: sin
+  // eso no hay a quién cobrarle el resto después.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountPaid?: number;
 }

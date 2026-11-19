@@ -17,12 +17,12 @@ export class PaymentsService {
 
   /**
    * Registra un abono (sección 18 del brief). Si está asociado a una orden
-   * de reparación, incrementa `RepairOrder.paidAmount` en la misma
+   * de reparación o a una venta, incrementa su `paidAmount` en la misma
    * transacción (el saldo pendiente sigue calculándose al vuelo como
-   * totalValue - paidAmount, nunca se almacena). Si hay una caja abierta,
-   * el abono también queda reflejado como ingreso de caja automáticamente
-   * (ver CashService.recordIncomeIfRegisterOpen) — sin bloquear el pago si
-   * no hay caja abierta ese día.
+   * total - paidAmount, nunca se almacena aparte). Si hay una caja
+   * abierta, el abono también queda reflejado como ingreso de caja
+   * automáticamente (ver CashService.recordIncomeIfRegisterOpen) — sin
+   * bloquear el pago si no hay caja abierta ese día.
    */
   async create(dto: CreatePaymentDto, actingUserId: number) {
     if (dto.repairOrderId && dto.saleId) {
@@ -60,6 +60,12 @@ export class PaymentsService {
       if (!sale) {
         throw new NotFoundException("La venta indicada no existe");
       }
+      if (sale.status !== "ACTIVE") {
+        throw new BadRequestException("Esta venta está cancelada — no se le pueden registrar abonos");
+      }
+      if (sale.customerId !== dto.customerId) {
+        throw new BadRequestException("La venta indicada no pertenece a este cliente");
+      }
       category = "Ventas";
     }
 
@@ -80,6 +86,13 @@ export class PaymentsService {
       if (dto.repairOrderId) {
         await tx.repairOrder.update({
           where: { id: dto.repairOrderId },
+          data: { paidAmount: { increment: dto.amount } },
+        });
+      }
+
+      if (dto.saleId) {
+        await tx.sale.update({
+          where: { id: dto.saleId },
           data: { paidAmount: { increment: dto.amount } },
         });
       }
@@ -155,6 +168,13 @@ export class PaymentsService {
       if (existing.repairOrderId && !delta.isZero()) {
         await tx.repairOrder.update({
           where: { id: existing.repairOrderId },
+          data: { paidAmount: { increment: delta } },
+        });
+      }
+
+      if (existing.saleId && !delta.isZero()) {
+        await tx.sale.update({
+          where: { id: existing.saleId },
           data: { paidAmount: { increment: delta } },
         });
       }

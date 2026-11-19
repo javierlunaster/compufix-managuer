@@ -35,6 +35,18 @@ export class FinanceService {
    * corrige el arqueo de caja, así que también se excluye aquí (la venta
    * cancelada y la compra corregida ya quedan fuera del conteo directo por
    * su propio status/paymentStatus).
+   *
+   * Una venta con saldo pendiente (ver Sale.paidAmount) se cuenta por su
+   * `total` COMPLETO en la fecha de la venta — igual que las compras de
+   * arriba, es una simplificación deliberada (contar la venta como
+   * ingreso del día en que se hizo, no repartida entre el día de la venta
+   * y el día en que se termina de cobrar). Por eso la consulta de
+   * `payments` excluye las filas con `saleId` (los abonos a una venta): ya
+   * están contados de una vez por el total de la venta, sumarlos aquí
+   * también los contaría dos veces. Los pagos de órdenes de reparación
+   * (repairOrderId) SÍ se cuentan aquí tal cual, porque RepairOrder no se
+   * suma nunca por su total — ahí cada abono es la única fuente de
+   * ingreso real, exactamente lo que se quiere medir día a día.
    */
   async getDailyBreakdown(year: number, month: number) {
     if (month < 1 || month > 12) {
@@ -47,7 +59,7 @@ export class FinanceService {
 
     const rows = await this.prisma.$queryRaw<SourceRow[]>`
       SELECT date_trunc('day', date) AS day, 'payments' AS source, 'income' AS kind, amount::text AS amount
-        FROM payments WHERE date >= ${start} AND date < ${end}
+        FROM payments WHERE "saleId" IS NULL AND date >= ${start} AND date < ${end}
       UNION ALL
       SELECT date_trunc('day', date) AS day, 'sales' AS source, 'income' AS kind, total::text AS amount
         FROM sales WHERE status = 'ACTIVE' AND date >= ${start} AND date < ${end}

@@ -553,11 +553,21 @@ export type Sale = {
   subtotal: string;
   discount: string;
   total: string;
+  paidAmount: string;
   paymentMethod: string;
   status: string;
   customer?: { id: number; fullName: string } | null;
   seller: { id: number; fullName: string };
   items?: SaleItem[];
+};
+
+// Lo que devuelve GET /sales/pending — igual a Sale pero con balance ya
+// calculado por el backend (total - paidAmount) y el teléfono del
+// cliente a la mano (siempre hay cliente: una venta con saldo pendiente
+// no puede ser anónima, ver SalesService.create).
+export type PendingSale = Sale & {
+  balance: string;
+  customer: { id: number; fullName: string; phone: string };
 };
 
 export type PurchaseItem = {

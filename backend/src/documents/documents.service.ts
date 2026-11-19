@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { HardwareTestCategory, HardwareTestStatus } from "@prisma/client";
+import { HardwareTestCategory, HardwareTestStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RepairOrdersService } from "../repair-orders/repair-orders.service";
@@ -649,6 +649,8 @@ export class DocumentsService {
       [140, 40, 80, 80, 150],
     );
 
+    const balance = new Prisma.Decimal(sale.total).minus(sale.paidAmount);
+
     pdf.spacer(10);
     pdf.keyValueGrid([
       ["Subtotal", formatCurrency(sale.subtotal)],
@@ -659,6 +661,18 @@ export class DocumentsService {
     pdf.doc.fontSize(14).fillColor("#111827").text(`Total: ${formatCurrency(sale.total)}`, {
       align: "right",
     });
+
+    // Mismo criterio que el comprobante de entrega (Abonado/Saldo) — una
+    // venta puede quedar con saldo pendiente a cargo del cliente (ver
+    // Sale.paidAmount), así que el recibo siempre deja constancia de
+    // cuánto se abonó y cuánto queda por cobrar, no solo del total.
+    pdf.doc.fontSize(11).fillColor("#374151").text(`Abonado: ${formatCurrency(sale.paidAmount)}`, {
+      align: "right",
+    });
+    pdf.doc
+      .fontSize(11)
+      .fillColor(balance.greaterThan(0) ? "#b45309" : "#374151")
+      .text(`Saldo pendiente: ${formatCurrency(balance)}`, { align: "right" });
 
     pdf.spacer(20);
     pdf.paragraph(

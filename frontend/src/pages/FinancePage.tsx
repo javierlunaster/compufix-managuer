@@ -141,7 +141,9 @@ export function FinancePage() {
           <p className="text-xs text-ink-muted">
             Las compras a proveedores se cuentan como egreso en la fecha de la compra, sin importar si
             ya se pagaron por completo — es una simplificación deliberada (no hay una fecha de "pago
-            real" registrada por separado de la compra misma).
+            real" registrada por separado de la compra misma). Lo mismo aplica a las ventas con saldo
+            pendiente: se cuentan por su valor total en la fecha de la venta, no repartidas entre ese
+            día y el día en que el cliente termina de pagar el resto.
           </p>
         </>
       )}
