@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
-import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, RepairServiceEntry, Service, DiagnosticMeasurement } from "@/lib/types";
+import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, RepairServiceEntry, Service, DiagnosticMeasurement, PaymentEntry } from "@/lib/types";
 import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
@@ -2203,10 +2203,13 @@ function AdjustTotalCard({
 // --- Pestaña: Pagos ----------------------------------------------------
 
 function PaymentsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged: () => void }) {
+  const { user } = useAuth();
+  const canEditPayments = user?.role === "Administrador" || user?.role === "Gerente";
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("CASH");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -2264,20 +2267,112 @@ function PaymentsTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
           <EmptyState title="Sin pagos registrados" />
         ) : (
           <ul className="divide-y divide-border">
-            {order.payments.map((p) => (
-              <li key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <div>
-                  <p className="text-ink">{formatCurrency(p.amount)}</p>
-                  <p className="text-xs text-ink-muted">
-                    {formatDateTime(p.date)} · {p.method} · {p.user.fullName}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {order.payments.map((p) =>
+              editingId === p.id ? (
+                <li key={p.id} className="px-4 py-3">
+                  <EditPaymentForm
+                    payment={p}
+                    onCancel={() => setEditingId(null)}
+                    onSaved={() => {
+                      setEditingId(null);
+                      onChanged();
+                    }}
+                  />
+                </li>
+              ) : (
+                <li key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div>
+                    <p className="text-ink">{formatCurrency(p.amount)}</p>
+                    <p className="text-xs text-ink-muted">
+                      {formatDateTime(p.date)} · {p.method} · {p.user.fullName}
+                    </p>
+                  </div>
+                  {canEditPayments && (
+                    <Button type="button" variant="ghost" onClick={() => setEditingId(p.id)}>
+                      Corregir
+                    </Button>
+                  )}
+                </li>
+              ),
+            )}
           </ul>
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Corregir un abono ya registrado (ver PaymentsService.update en el
+ * backend — restringido a Administrador/Gerente, igual que esta acción).
+ * A diferencia de "Registrar abono" de arriba, esto no crea un pago
+ * nuevo: ajusta el mismo registro, y junto con él el saldo de la orden y
+ * — si la caja donde quedó ese ingreso sigue abierta — el arqueo del día.
+ */
+function EditPaymentForm({
+  payment,
+  onCancel,
+  onSaved,
+}: {
+  payment: PaymentEntry;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [amount, setAmount] = useState(String(payment.amount));
+  const [method, setMethod] = useState(payment.method);
+  const [reference, setReference] = useState(payment.reference ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await api.patch(`/payments/${payment.id}`, {
+        amount: Number(amount),
+        method,
+        reference: reference || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo corregir el abono");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+      {error && <ErrorBanner message={error} />}
+      <Field label="Monto">
+        <Input
+          type="number"
+          min={1}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+        />
+      </Field>
+      <Field label="Método">
+        <Select value={method} onChange={(e) => setMethod(e.target.value)}>
+          {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Referencia">
+        <Input value={reference} onChange={(e) => setReference(e.target.value)} />
+      </Field>
+      <Button type="submit" variant="primary" disabled={saving}>
+        {saving ? "Guardando…" : "Guardar"}
+      </Button>
+      <Button type="button" variant="ghost" onClick={onCancel}>
+        Cancelar
+      </Button>
+    </form>
   );
 }
 

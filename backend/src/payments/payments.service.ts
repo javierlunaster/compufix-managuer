@@ -5,6 +5,7 @@ import { AuditService } from "../audit/audit.service";
 import { CashService } from "../cash/cash.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
 import { CreateRefundDto } from "./dto/create-refund.dto";
+import { UpdatePaymentDto } from "./dto/update-payment.dto";
 
 @Injectable()
 export class PaymentsService {
@@ -108,6 +109,85 @@ export class PaymentsService {
         repairOrderId: dto.repairOrderId,
         saleId: dto.saleId,
         amount: dto.amount,
+      },
+    });
+
+    return payment;
+  }
+
+  /**
+   * Corrige un abono ya registrado (monto/método/referencia/notas) — para
+   * cuando alguien se equivocó al digitar el valor. Nunca se reasigna a
+   * otro cliente/orden/venta (eso sería otro pago, no una corrección): ese
+   * trío de relaciones se queda igual, solo cambian los datos del valor en
+   * sí. Tampoco se toca `date` ni `userId` — sigue siendo el mismo evento
+   * histórico, solo con el dato correcto.
+   *
+   * Mismo criterio que el resto del sistema con la caja (ver
+   * CashService.reverseSaleIncomeIfStillOpen / reversePurchaseExpenseIfStillOpen):
+   * si la caja donde quedó reflejado el ingreso de este abono ya se cerró,
+   * el arqueo de ese día NO se toca — es un snapshot congelado. El
+   * movimiento de caja solo se ajusta cuando esa caja sigue abierta.
+   */
+  async update(id: number, dto: UpdatePaymentDto, actingUserId: number) {
+    const existing = await this.prisma.payment.findUnique({
+      where: { id },
+      include: { cashMovements: { include: { cashRegister: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Pago no encontrado");
+    }
+
+    const newAmount = new Prisma.Decimal(dto.amount);
+    const delta = newAmount.minus(existing.amount);
+
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.payment.update({
+        where: { id },
+        data: {
+          amount: newAmount,
+          method: dto.method,
+          reference: dto.reference,
+          notes: dto.notes,
+        },
+      });
+
+      if (existing.repairOrderId && !delta.isZero()) {
+        await tx.repairOrder.update({
+          where: { id: existing.repairOrderId },
+          data: { paidAmount: { increment: delta } },
+        });
+      }
+
+      if (!delta.isZero()) {
+        const openMovement = existing.cashMovements.find(
+          (m) => m.cashRegister.status === "OPEN",
+        );
+        if (openMovement) {
+          await tx.cashMovement.update({
+            where: { id: openMovement.id },
+            data: { amount: { increment: delta } },
+          });
+        }
+      }
+
+      return updated;
+    });
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "UPDATE",
+      entityType: "Payment",
+      entityId: id,
+      previousValue: {
+        amount: existing.amount,
+        method: existing.method,
+        reference: existing.reference,
+      },
+      newValue: {
+        amount: payment.amount,
+        method: payment.method,
+        reference: payment.reference,
       },
     });
 
