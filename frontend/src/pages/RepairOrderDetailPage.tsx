@@ -1835,24 +1835,8 @@ function WarrantyTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
         <Card>
           <EmptyState
             title="Sin garantía generada todavía"
-            description="Se genera al entregar el equipo — indica cuántos meses de cobertura aplican"
+            description="Se genera sola al entregar el equipo, por cada repuesto o servicio usado que tenga garantía configurada en su ficha — esta opción es solo para agregar una cobertura adicional a mano."
           />
-          <div className="border-t border-border p-4">
-            {showForm ? (
-              <NewWarrantyForm
-                orderId={order.id}
-                onCreated={() => {
-                  setShowForm(false);
-                  onChanged();
-                }}
-                onCancel={() => setShowForm(false)}
-              />
-            ) : (
-              <Button variant="primary" onClick={() => setShowForm(true)}>
-                + Generar garantía
-              </Button>
-            )}
-          </div>
         </Card>
       ) : (
         <Card>
@@ -1883,6 +1867,26 @@ function WarrantyTab({ order, onChanged }: { order: RepairOrderDetail; onChanged
           </ul>
         </Card>
       )}
+
+      <Card>
+        <CardHeader title="Agregar cobertura manual" />
+        <div className="p-4">
+          {showForm ? (
+            <NewWarrantyForm
+              orderId={order.id}
+              onCreated={() => {
+                setShowForm(false);
+                onChanged();
+              }}
+              onCancel={() => setShowForm(false)}
+            />
+          ) : (
+            <Button variant="secondary" onClick={() => setShowForm(true)}>
+              + Agregar garantía manual
+            </Button>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

@@ -901,6 +901,8 @@ model RepairPart {
   unitCost      Decimal     @db.Decimal(12, 2) // costo al momento de usarlo
   unitPrice     Decimal     @db.Decimal(12, 2) // precio cobrado al cliente
 
+  warranty Warranty?
+
   @@map("repair_parts")
 }
 
@@ -923,6 +925,8 @@ model RepairService {
   description   String?
   price         Decimal     @db.Decimal(12, 2)
   cost          Decimal     @default(0) @db.Decimal(12, 2)
+
+  warranty Warranty?
 
   @@map("repair_services")
 }
@@ -1035,6 +1039,18 @@ model Warranty {
   claimingCustomerId  Int?
   claimingCustomer    Customer?      @relation("ClaimingCustomer", fields: [claimingCustomerId], references: [id])
   claimNotes          String?
+
+  // Generadas automáticamente al entregar el equipo, una por cada
+  // repuesto/servicio usado que tenga garantía configurada (ver
+  // RepairOrdersService — método privado que corre al pasar una orden a
+  // DELIVERED). @unique es lo que evita duplicar la garantía del mismo
+  // ítem si la orden se reabre y se vuelve a entregar más de una vez.
+  // Null en ambas = garantía manual de toda la reparación (el flujo
+  // anterior, WarrantiesService.create, sigue existiendo para eso).
+  repairPartId    Int?           @unique
+  repairPart      RepairPart?    @relation(fields: [repairPartId], references: [id])
+  repairServiceId Int?           @unique
+  repairService   RepairService? @relation(fields: [repairServiceId], references: [id])
 
   @@map("warranties")
 }

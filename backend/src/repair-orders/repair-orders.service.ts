@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, QuotationStatus, RepairStatus } from "@prisma/client";
+import { Prisma, QuotationStatus, RepairStatus, WarrantyStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { encryptSecret, decryptSecret } from "../common/utils/encryption.util";
@@ -405,6 +405,10 @@ export class RepairOrdersService {
       newValue: { status: order.status },
     });
 
+    if (dto.newStatus === RepairStatus.DELIVERED) {
+      await this.generateWarrantiesOnDelivery(id, actingUserId);
+    }
+
     const full = await this.findOne(id);
 
     if (dto.newStatus === RepairStatus.READY_FOR_PICKUP) {
@@ -671,6 +675,106 @@ export class RepairOrdersService {
     });
 
     return this.findOne(id);
+  }
+
+  /**
+   * Al entregar el equipo (sección 17 del brief): genera automáticamente
+   * la garantía de cada repuesto/servicio usado que tenga
+   * Product.warrantyMonths/Service.warrantyMonths configurado — sin que
+   * nadie tenga que acordarse de crearla a mano en la pestaña Garantía.
+   * `deliveryDate` se fija a "ahora" en cada entrega (si la orden se
+   * reabre y se vuelve a entregar, cuenta como una entrega nueva: un
+   * repuesto agregado en esa segunda vuelta debe empezar a contar su
+   * garantía desde ESA entrega, no desde la primera).
+   *
+   * Un repuesto/servicio que ya tiene su garantía generada (constraint
+   * @unique en Warranty.repairPartId/repairServiceId) no se vuelve a
+   * procesar — así una orden que pasa por DELIVERED más de una vez nunca
+   * duplica la garantía de lo que ya se entregó antes, solo cubre lo
+   * nuevo. Un repuesto/servicio sin warrantyMonths configurado
+   * simplemente no genera nada — nunca se inventa una garantía que el
+   * catálogo no tiene.
+   */
+  private async generateWarrantiesOnDelivery(orderId: number, actingUserId: number) {
+    const order = await this.prisma.repairOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        partsUsed: {
+          include: { product: { select: { description: true, warrantyMonths: true } } },
+        },
+        servicesUsed: {
+          include: { service: { select: { name: true, warrantyMonths: true } } },
+        },
+      },
+    });
+    if (!order) {
+      return;
+    }
+
+    const deliveryDate = new Date();
+    await this.prisma.repairOrder.update({
+      where: { id: orderId },
+      data: { deliveryDate },
+    });
+
+    function endDateFor(months: number) {
+      const end = new Date(deliveryDate);
+      end.setMonth(end.getMonth() + months);
+      return end;
+    }
+
+    const toCreate: Prisma.WarrantyCreateManyInput[] = [];
+
+    for (const part of order.partsUsed) {
+      const months = part.product.warrantyMonths;
+      if (!months || months <= 0) continue;
+      toCreate.push({
+        repairOrderId: orderId,
+        repairPartId: part.id,
+        deliveryDate,
+        warrantyStartDate: deliveryDate,
+        warrantyEndDate: endDateFor(months),
+        coverageDescription: `Repuesto: ${part.product.description}`,
+        status: WarrantyStatus.ACTIVE,
+      });
+    }
+
+    for (const svc of order.servicesUsed) {
+      const months = svc.service?.warrantyMonths;
+      if (!months || months <= 0) continue;
+      toCreate.push({
+        repairOrderId: orderId,
+        repairServiceId: svc.id,
+        deliveryDate,
+        warrantyStartDate: deliveryDate,
+        warrantyEndDate: endDateFor(months),
+        coverageDescription: `Servicio: ${svc.service!.name}`,
+        status: WarrantyStatus.ACTIVE,
+      });
+    }
+
+    if (toCreate.length === 0) {
+      return;
+    }
+
+    // skipDuplicates: si por lo que sea un repuesto/servicio ya tenía
+    // garantía (reentrega), el índice único la descarta en vez de tumbar
+    // toda la operación.
+    const { count } = await this.prisma.warranty.createMany({
+      data: toCreate,
+      skipDuplicates: true,
+    });
+    if (count === 0) {
+      return;
+    }
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "AUTO_CREATE",
+      entityType: "Warranty",
+      entityId: orderId,
+      newValue: { repairOrderId: orderId, count },
+    });
   }
 
   private async ensureExists(id: number) {
