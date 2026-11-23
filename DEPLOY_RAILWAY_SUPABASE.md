@@ -267,7 +267,7 @@ variables **todas nuevas**, nunca copiadas de CompuFix:
 | `NODE_ENV` | `production` |
 | `FRONTEND_URL` | vacío por ahora (Paso 5) |
 | `BUSINESS_NAME` / `BUSINESS_TAGLINE` | nombre y lema del negocio del cliente (ver `backend/.env.example`) |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | opcional — solo si el cliente quiere notificaciones por correo (ver `backend/.env.example` para cómo generar la contraseña de aplicación) |
+| `RESEND_API_KEY` / `MAIL_FROM` | opcional — solo si el cliente quiere notificaciones por correo, con su propio dominio verificado en Resend |
 
 ### Paso C — Base de datos en blanco (sin datos de CompuFix)
 
