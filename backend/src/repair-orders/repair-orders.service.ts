@@ -68,6 +68,7 @@ const ORDER_DETAIL_INCLUDE = {
     orderBy: { date: "desc" as const },
   },
   warranties: { orderBy: { deliveryDate: "desc" as const } },
+  emailNotifications: { orderBy: { sentAt: "desc" as const } },
   hardwareTestResults: {
     orderBy: { testedAt: "asc" as const },
     include: { testedBy: { select: { id: true, fullName: true } } },
@@ -223,6 +224,7 @@ export class RepairOrdersService {
     const full = await this.findOne(order.id);
 
     await this.mail.sendOrderReceived({
+      repairOrderId: full.id,
       to: full.customer.email,
       customerName: full.customer.fullName,
       orderCode: full.orderCode,
@@ -413,6 +415,7 @@ export class RepairOrdersService {
 
     if (dto.newStatus === RepairStatus.READY_FOR_PICKUP) {
       await this.mail.sendOrderReady({
+        repairOrderId: full.id,
         to: full.customer.email,
         customerName: full.customer.fullName,
         orderCode: full.orderCode,

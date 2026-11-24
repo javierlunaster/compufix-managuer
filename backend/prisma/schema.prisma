@@ -709,6 +709,7 @@ model RepairOrder {
   inventoryMovements  InventoryMovement[]
   hardwareTestResults HardwareTestResult[]
   cashMovements       CashMovement[]
+  emailNotifications  EmailNotification[]
 
   @@map("repair_orders")
 }
@@ -1053,6 +1054,38 @@ model Warranty {
   repairService   RepairService? @relation(fields: [repairServiceId], references: [id])
 
   @@map("warranties")
+}
+
+// Registro de cada correo de notificación que el sistema intentó enviarle
+// al cliente de una orden (ver mail/mail.service.ts) — para que quede
+// constancia en la propia orden de qué se le avisó y cuándo, sin tener que
+// ir a buscar en los logs del servidor. Se guarda tanto si se envió bien
+// como si falló (sin correo registrado, Resend no configurado, error de
+// Resend) — "sin registro" y "sí se envió" son dos cosas muy distintas
+// para el técnico que necesita saber si el cliente de verdad se enteró.
+enum EmailNotificationEvent {
+  ORDER_RECEIVED
+  ORDER_READY
+  QUOTATION_SENT
+}
+
+enum EmailNotificationStatus {
+  SENT
+  FAILED
+}
+
+model EmailNotification {
+  id            Int                     @id @default(autoincrement())
+  repairOrderId Int
+  repairOrder   RepairOrder             @relation(fields: [repairOrderId], references: [id])
+  event         EmailNotificationEvent
+  recipient     String
+  subject       String
+  status        EmailNotificationStatus
+  errorMessage  String?
+  sentAt        DateTime                @default(now())
+
+  @@map("email_notifications")
 }
 
 // -----------------------------------------------------------------------------

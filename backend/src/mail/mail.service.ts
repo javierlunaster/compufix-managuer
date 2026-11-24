@@ -1,5 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Resend } from "resend";
+import { EmailNotificationEvent } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 import { orderReadyEmail, orderReceivedEmail, quotationSentEmail } from "./templates";
 import { BusinessSettingsService } from "../business-settings/business-settings.service";
 
@@ -17,7 +19,10 @@ export class MailService implements OnModuleInit {
   private client: Resend | null = null;
   private from: string;
 
-  constructor(private businessSettings: BusinessSettingsService) {}
+  constructor(
+    private businessSettings: BusinessSettingsService,
+    private prisma: PrismaService,
+  ) {}
 
   onModuleInit() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -37,9 +42,78 @@ export class MailService implements OnModuleInit {
     return `${frontendUrl}${path}`;
   }
 
-  private async send(to: string | null | undefined, subject: string, html: string): Promise<void> {
-    if (!this.client) return;
-    if (!to) return; // El cliente no tiene correo registrado — no hay a quién avisar.
+  /**
+   * Deja constancia en EmailNotification de cada intento (bien sea que se
+   * haya enviado o que haya fallado) — para que en la propia orden quede
+   * registrado qué se le avisó al cliente, sin tener que ir a los logs del
+   * servidor. "Mejor esfuerzo" como todo lo demás en este servicio: si el
+   * registro mismo falla (ej. la base de datos no responde), no se relanza
+   * — ya es demasiado tarde para eso, el correo ya se intentó o se envió.
+   * `repairOrderId` es opcional porque una cotización puede no venir de
+   * una orden de reparación (sourceOrderId null, ver QuotationsService) —
+   * en ese caso no hay dónde dejar el registro, y está bien que no quede.
+   */
+  private async logNotification(params: {
+    repairOrderId?: number | null;
+    event: EmailNotificationEvent;
+    recipient: string;
+    subject: string;
+    status: "SENT" | "FAILED";
+    errorMessage?: string;
+  }) {
+    if (!params.repairOrderId) return;
+    try {
+      await this.prisma.emailNotification.create({
+        data: {
+          repairOrderId: params.repairOrderId,
+          event: params.event,
+          recipient: params.recipient,
+          subject: params.subject,
+          status: params.status,
+          errorMessage: params.errorMessage,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `No se pudo registrar el historial de la notificación "${params.subject}": ${(err as Error).message}`,
+      );
+    }
+  }
+
+  private async send(params: {
+    repairOrderId?: number | null;
+    event: EmailNotificationEvent;
+    to: string | null | undefined;
+    subject: string;
+    html: string;
+  }): Promise<void> {
+    const { repairOrderId, event, to, subject, html } = params;
+
+    if (!to) {
+      // El cliente no tiene correo registrado — no hay a quién avisar,
+      // pero queda constancia de que no se pudo (y por qué) en la orden.
+      await this.logNotification({
+        repairOrderId,
+        event,
+        recipient: "(sin correo registrado)",
+        subject,
+        status: "FAILED",
+        errorMessage: "El cliente no tiene correo registrado",
+      });
+      return;
+    }
+
+    if (!this.client) {
+      await this.logNotification({
+        repairOrderId,
+        event,
+        recipient: to,
+        subject,
+        status: "FAILED",
+        errorMessage: "Resend no está configurado (falta RESEND_API_KEY)",
+      });
+      return;
+    }
 
     try {
       // El SDK de Resend NO lanza una excepción cuando la API responde con
@@ -50,16 +124,35 @@ export class MailService implements OnModuleInit {
       const { error } = await this.client.emails.send({ from: this.from, to, subject, html });
       if (error) {
         this.logger.error(`No se pudo enviar el correo "${subject}" a ${to}: ${error.message}`);
+        await this.logNotification({
+          repairOrderId,
+          event,
+          recipient: to,
+          subject,
+          status: "FAILED",
+          errorMessage: error.message,
+        });
+        return;
       }
+      await this.logNotification({ repairOrderId, event, recipient: to, subject, status: "SENT" });
     } catch (err) {
       // Nunca se relanza: un correo que no salió no debe tumbar la
       // creación de la orden, el cambio de estado, ni el envío de la
       // cotización que sí importan de verdad.
       this.logger.error(`No se pudo enviar el correo "${subject}" a ${to}: ${(err as Error).message}`);
+      await this.logNotification({
+        repairOrderId,
+        event,
+        recipient: to,
+        subject,
+        status: "FAILED",
+        errorMessage: (err as Error).message,
+      });
     }
   }
 
   async sendOrderReceived(params: {
+    repairOrderId: number;
     to: string | null | undefined;
     customerName: string;
     orderCode: string;
@@ -75,10 +168,17 @@ export class MailService implements OnModuleInit {
       portalUrl: this.portalUrl("/portal/login"),
       businessName,
     });
-    await this.send(params.to, subject, html);
+    await this.send({
+      repairOrderId: params.repairOrderId,
+      event: EmailNotificationEvent.ORDER_RECEIVED,
+      to: params.to,
+      subject,
+      html,
+    });
   }
 
   async sendQuotationSent(params: {
+    repairOrderId?: number | null;
     to: string | null | undefined;
     customerName: string;
     quotationNumber: string;
@@ -92,10 +192,17 @@ export class MailService implements OnModuleInit {
       portalUrl: this.portalUrl("/portal/login"),
       businessName,
     });
-    await this.send(params.to, subject, html);
+    await this.send({
+      repairOrderId: params.repairOrderId,
+      event: EmailNotificationEvent.QUOTATION_SENT,
+      to: params.to,
+      subject,
+      html,
+    });
   }
 
   async sendOrderReady(params: {
+    repairOrderId: number;
     to: string | null | undefined;
     customerName: string;
     orderCode: string;
@@ -111,6 +218,12 @@ export class MailService implements OnModuleInit {
       portalUrl: this.portalUrl("/portal/login"),
       businessName,
     });
-    await this.send(params.to, subject, html);
+    await this.send({
+      repairOrderId: params.repairOrderId,
+      event: EmailNotificationEvent.ORDER_READY,
+      to: params.to,
+      subject,
+      html,
+    });
   }
 }

@@ -368,6 +368,7 @@ export class QuotationsService {
 
     if (dto.newStatus === QuotationStatus.SENT) {
       await this.mail.sendQuotationSent({
+        repairOrderId: full.sourceOrderId,
         to: full.customer.email,
         customerName: full.customer.fullName,
         quotationNumber: full.quotationNumber,

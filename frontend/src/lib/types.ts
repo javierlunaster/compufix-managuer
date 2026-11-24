@@ -302,6 +302,25 @@ export const WARRANTY_STATUS_LABELS: Record<WarrantyStatus, string> = {
   CLAIMED: "Reclamada",
 };
 
+export type EmailNotificationEvent = "ORDER_RECEIVED" | "ORDER_READY" | "QUOTATION_SENT";
+export type EmailNotificationStatus = "SENT" | "FAILED";
+
+export const EMAIL_NOTIFICATION_EVENT_LABELS: Record<EmailNotificationEvent, string> = {
+  ORDER_RECEIVED: "Equipo recibido",
+  ORDER_READY: "Equipo listo para entrega",
+  QUOTATION_SENT: "Cotización enviada",
+};
+
+export type EmailNotification = {
+  id: number;
+  event: EmailNotificationEvent;
+  recipient: string;
+  subject: string;
+  status: EmailNotificationStatus;
+  errorMessage?: string | null;
+  sentAt: string;
+};
+
 export type Warranty = {
   id: number;
   deliveryDate: string;
@@ -351,6 +370,7 @@ export type RepairOrderDetail = {
   payments: PaymentEntry[];
   photos: Attachment[];
   warranties: Warranty[];
+  emailNotifications: EmailNotification[];
   hardwareTestResults: HardwareTestResult[];
   customerSignatureUrl?: string | null;
   customerSignatureDate?: string | null;

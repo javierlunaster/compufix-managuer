@@ -4,7 +4,12 @@ import { useAuth } from "@/lib/auth";
 import { api, ApiError, resolvePhotoUrl } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import type { RepairOrderDetail, RepairStatus, Product, PartsCostSummary, RepairLogEntry, Diagnostic, RepairPartEntry, RepairServiceEntry, Service, DiagnosticMeasurement, PaymentEntry } from "@/lib/types";
-import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
+import {
+  REPAIR_STATUSES,
+  REPAIR_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  EMAIL_NOTIFICATION_EVENT_LABELS,
+} from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { DeviceSpecsCard } from "@/components/DeviceSpecsCard";
 import { ProductSearch } from "@/components/ProductSearch";
@@ -2488,21 +2493,51 @@ function RefundCard({
 
 function HistoryTab({ order }: { order: RepairOrderDetail }) {
   return (
-    <Card>
-      <ul className="divide-y divide-border">
-        {order.statusHistory.map((h) => (
-          <li key={h.id} className="flex items-center gap-4 px-4 py-3 text-sm">
-            <span className="w-28 shrink-0 tabular text-xs text-ink-muted">
-              {formatDate(h.changedAt)}
-            </span>
-            <span className="text-ink">
-              {h.previousStatus ? `${REPAIR_STATUS_LABELS[h.previousStatus]} → ` : ""}
-              {REPAIR_STATUS_LABELS[h.newStatus]}
-            </span>
-            <span className="ml-auto text-xs text-ink-muted">{h.user.fullName}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader title="Cambios de estado" />
+        <ul className="divide-y divide-border">
+          {order.statusHistory.map((h) => (
+            <li key={h.id} className="flex items-center gap-4 px-4 py-3 text-sm">
+              <span className="w-28 shrink-0 tabular text-xs text-ink-muted">
+                {formatDate(h.changedAt)}
+              </span>
+              <span className="text-ink">
+                {h.previousStatus ? `${REPAIR_STATUS_LABELS[h.previousStatus]} → ` : ""}
+                {REPAIR_STATUS_LABELS[h.newStatus]}
+              </span>
+              <span className="ml-auto text-xs text-ink-muted">{h.user.fullName}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card>
+        <CardHeader title="Notificaciones por correo" />
+        {order.emailNotifications.length === 0 ? (
+          <EmptyState title="Ninguna notificación enviada todavía" />
+        ) : (
+          <ul className="divide-y divide-border">
+            {order.emailNotifications.map((n) => (
+              <li key={n.id} className="px-4 py-3 text-sm">
+                <div className="flex items-center gap-4">
+                  <span className="w-36 shrink-0 tabular text-xs text-ink-muted">
+                    {formatDateTime(n.sentAt)}
+                  </span>
+                  <span className="text-ink">{EMAIL_NOTIFICATION_EVENT_LABELS[n.event]}</span>
+                  <span className="text-xs text-ink-muted">a {n.recipient}</span>
+                  <span className={`ml-auto text-xs ${n.status === "SENT" ? "text-success" : "text-danger"}`}>
+                    {n.status === "SENT" ? "Enviado" : "No enviado"}
+                  </span>
+                </div>
+                {n.status === "FAILED" && n.errorMessage && (
+                  <p className="mt-1 pl-36 text-xs text-danger">{n.errorMessage}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
