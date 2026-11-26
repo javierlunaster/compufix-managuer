@@ -597,6 +597,104 @@ export class DocumentsService {
   }
 
   /**
+   * Cotización unificada (ver QuotationGroupsService) — un cliente con
+   * varios equipos recibidos a la vez puede pedir un solo documento con
+   * el total combinado en vez de uno por equipo. Cada cotización
+   * agrupada se muestra como su propia sección (con su equipo, si tiene
+   * orden de origen) y al final un gran total que suma todas — nunca se
+   * fusionan los ítems entre sí, cada cotización sigue siendo su propio
+   * detalle dentro del documento.
+   */
+  async generateQuotationGroupPdf(groupId: number, actingUserId: number) {
+    const group = await this.prisma.quotationGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        customer: true,
+        quotations: {
+          orderBy: { id: "asc" },
+          include: {
+            sourceOrder: { select: { orderCode: true, device: { include: { brand: true } } } },
+            items: true,
+          },
+        },
+      },
+    });
+    if (!group) {
+      throw new NotFoundException("Grupo de cotizaciones no encontrado");
+    }
+    const branding = await this.businessSettings.getBrandingForDocuments();
+
+    const pdf = new PdfBuilder();
+    pdf.header({
+      docTitle: "Cotización unificada",
+      docSubtitle: `${group.groupNumber} · ${formatDate(group.date)}`,
+      businessName: branding.businessName,
+      businessTagline: branding.tagline,
+    });
+
+    pdf.sectionTitle("Cliente").keyValueGrid([
+      ["Nombre", group.customer.fullName],
+      ["Teléfono", group.customer.phone],
+    ]);
+
+    let grandTotal = 0;
+    for (const quotation of group.quotations) {
+      grandTotal += Number(quotation.total);
+
+      const equipmentLabel = quotation.sourceOrder
+        ? `${quotation.sourceOrder.orderCode} · ${`${quotation.sourceOrder.device.brand?.name ?? ""} ${quotation.sourceOrder.device.model ?? ""}`.trim()}`
+        : "Sin equipo asociado";
+
+      pdf.sectionTitle(`${quotation.quotationNumber} — ${equipmentLabel}`);
+      pdf.table(
+        ["Descripción", "Cant.", "Precio unit.", "Subtotal"],
+        quotation.items.map((item) => [
+          item.description,
+          String(item.quantity),
+          formatCurrency(item.unitPrice),
+          formatCurrency(item.subtotal),
+        ]),
+        [260, 50, 90, 90],
+      );
+      pdf.doc
+        .fontSize(10)
+        .fillColor("#111827")
+        .text(`Subtotal ${quotation.quotationNumber}: ${formatCurrency(quotation.total)}`, {
+          align: "right",
+        });
+      pdf.spacer(10);
+    }
+
+    pdf.spacer(10);
+    pdf.doc.fontSize(14).fillColor("#111827").text(`Total unificado: ${formatCurrency(grandTotal)}`, {
+      align: "right",
+    });
+
+    if (group.notes) {
+      pdf.sectionTitle("Observaciones").paragraph(group.notes);
+    }
+
+    pdf.spacer(30);
+    pdf.paragraph(
+      `Este documento agrupa ${group.quotations.length} cotizaciones en un solo total — cada una conserva ` +
+        "su propio número y puede consultarse por separado. Para aprobar, comunícate con el taller.",
+    );
+
+    pdf.footer(`${branding.businessName} · Cotización unificada ${group.groupNumber}`);
+
+    const buffer = await pdf.build();
+
+    await this.audit.log({
+      userId: actingUserId,
+      action: "GENERATE_QUOTATION_GROUP_PDF",
+      entityType: "QuotationGroup",
+      entityId: groupId,
+    });
+
+    return { buffer, filename: `cotizacion-unificada-${group.groupNumber}.pdf` };
+  }
+
+  /**
    * Recibo de una venta de mostrador (ver SalesService) — detalla cada
    * artículo comprado junto con su garantía, calculada igual que
    * WarrantiesService.create (fecha de la venta + Product.warrantyMonths).

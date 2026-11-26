@@ -19,6 +19,7 @@ import { CreateQuotationItemDto } from "./dto/create-quotation-item.dto";
 const QUOTATION_DETAIL_INCLUDE = {
   customer: { select: { id: true, fullName: true, phone: true, email: true } },
   sourceOrder: { select: { id: true, orderCode: true, status: true } },
+  group: { select: { id: true, groupNumber: true } },
   items: {
     include: {
       product: { select: { id: true, sku: true, description: true } },
@@ -149,6 +150,7 @@ export class QuotationsService {
       include: {
         customer: { select: { id: true, fullName: true } },
         sourceOrder: { select: { id: true, orderCode: true } },
+        group: { select: { id: true, groupNumber: true } },
       },
       orderBy: { date: "desc" },
       take: 100,

@@ -231,9 +231,13 @@ export class CustomerPortalService {
     QuotationStatus.PENDING,
   ];
 
+  // groupId: null — una cotización agrupada (ver QuotationGroup) se
+  // muestra al cliente a través del grupo, no suelta además: mostrar las
+  // 9 por separado Y la unificada sería confuso ("¿tengo que aprobar 10
+  // cosas?").
   findMyQuotations(customerId: number) {
     return this.prisma.customerQuotation.findMany({
-      where: { customerId },
+      where: { customerId, groupId: null },
       select: {
         id: true,
         quotationNumber: true,
@@ -313,6 +317,111 @@ export class CustomerPortalService {
       where: { id: quotationId },
       data: { status: QuotationStatus.REJECTED },
     });
+  }
+
+  // --- Cotizaciones unificadas (QuotationGroup) -------------------------
+  // Varios equipos del mismo cliente, un solo total combinado — ver
+  // QuotationGroupsService (lado del personal). Acá el cliente solo ve y
+  // aprueba/rechaza, nunca crea ni edita el grupo.
+
+  private withGroupTotal<T extends { quotations: { status: QuotationStatus; total: unknown }[] }>(
+    group: T,
+  ) {
+    const total = group.quotations.reduce((sum, q) => sum + Number(q.total), 0);
+    const statuses = group.quotations.map((q) => q.status);
+    let status: QuotationStatus = QuotationStatus.PENDING;
+    if (statuses.every((s) => s === QuotationStatus.APPROVED || s === QuotationStatus.CONVERTED)) {
+      status = QuotationStatus.APPROVED;
+    } else if (statuses.every((s) => s === QuotationStatus.REJECTED)) {
+      status = QuotationStatus.REJECTED;
+    }
+    return { ...group, total, status };
+  }
+
+  async findMyQuotationGroups(customerId: number) {
+    const groups = await this.prisma.quotationGroup.findMany({
+      where: { customerId },
+      select: {
+        id: true,
+        groupNumber: true,
+        date: true,
+        quotations: {
+          select: { id: true, status: true, total: true },
+        },
+      },
+      orderBy: { date: "desc" },
+    });
+    return groups.map((g) => this.withGroupTotal(g));
+  }
+
+  async findMyQuotationGroupDetail(customerId: number, groupId: number) {
+    const group = await this.prisma.quotationGroup.findUnique({
+      where: { id: groupId },
+      select: {
+        id: true,
+        customerId: true,
+        groupNumber: true,
+        date: true,
+        notes: true,
+        quotations: {
+          select: {
+            id: true,
+            quotationNumber: true,
+            status: true,
+            total: true,
+            sourceOrder: { select: { id: true, orderCode: true } },
+            items: {
+              select: { id: true, description: true, quantity: true, unitPrice: true, subtotal: true },
+            },
+          },
+        },
+      },
+    });
+    if (!group || group.customerId !== customerId) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    const { customerId: _omit, ...safeGroup } = group;
+    return this.withGroupTotal(safeGroup);
+  }
+
+  // Mismo criterio que ensureOwnedAndApprovable: el cliente solo puede
+  // responder mientras TODAS las cotizaciones del grupo siguen esperando
+  // su respuesta — si alguna ya se resolvió por separado (desde el panel
+  // del personal, por ejemplo), el grupo ya no se puede aprobar/rechazar
+  // como bloque desde aquí.
+  private async ensureGroupOwnedAndApprovable(customerId: number, groupId: number) {
+    const group = await this.prisma.quotationGroup.findUnique({
+      where: { id: groupId },
+      include: { quotations: true },
+    });
+    if (!group || group.customerId !== customerId) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (
+      group.quotations.length === 0 ||
+      !group.quotations.every((q) => this.APPROVABLE_STATUSES.includes(q.status))
+    ) {
+      throw new BadRequestException("Esta cotización ya no está pendiente de tu respuesta");
+    }
+    return group;
+  }
+
+  async approveMyQuotationGroup(customerId: number, groupId: number) {
+    const group = await this.ensureGroupOwnedAndApprovable(customerId, groupId);
+    await this.prisma.customerQuotation.updateMany({
+      where: { id: { in: group.quotations.map((q) => q.id) } },
+      data: { status: QuotationStatus.APPROVED },
+    });
+    return this.findMyQuotationGroupDetail(customerId, groupId);
+  }
+
+  async rejectMyQuotationGroup(customerId: number, groupId: number) {
+    const group = await this.ensureGroupOwnedAndApprovable(customerId, groupId);
+    await this.prisma.customerQuotation.updateMany({
+      where: { id: { in: group.quotations.map((q) => q.id) } },
+      data: { status: QuotationStatus.REJECTED },
+    });
+    return this.findMyQuotationGroupDetail(customerId, groupId);
   }
 
   // Firmar "recibido a satisfacción" solo tiene sentido cuando el equipo

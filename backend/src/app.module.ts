@@ -23,6 +23,7 @@ import { RepairPartsModule } from "./repair-parts/repair-parts.module";
 import { RepairServicesModule } from "./repair-services/repair-services.module";
 import { ServicesModule } from "./services/services.module";
 import { QuotationsModule } from "./quotations/quotations.module";
+import { QuotationGroupsModule } from "./quotation-groups/quotation-groups.module";
 import { SuppliersModule } from "./suppliers/suppliers.module";
 import { PurchasesModule } from "./purchases/purchases.module";
 import { SalesModule } from "./sales/sales.module";
@@ -71,6 +72,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     RepairServicesModule,
     ServicesModule,
     QuotationsModule,
+    QuotationGroupsModule,
     SuppliersModule,
     PurchasesModule,
     SalesModule,

@@ -210,6 +210,7 @@ model Customer {
   repairOrders     RepairOrder[]       @relation("CustomerOrders")
   devices          Device[]            @relation("CustomerDevices")
   quotations       CustomerQuotation[]
+  quotationGroups  QuotationGroup[]
   sales            Sale[]
   payments         Payment[]
   serviceJobs      ServiceJob[]
@@ -963,9 +964,40 @@ model CustomerQuotation {
   validUntil      DateTime?
   notes           String?
 
+  // Si el cliente tiene varios equipos cada uno con su propia cotización
+  // y pide un solo total unificado (ver QuotationGroupsService), se
+  // agrupan aquí sin tocar nada de su propio estado/items — cada una
+  // sigue siendo su propia cotización (y su propia conversión a orden,
+  // si aplica), el grupo solo es una envoltura para verlas y aprobarlas
+  // juntas.
+  groupId Int?
+  group   QuotationGroup? @relation(fields: [groupId], references: [id])
+
   items QuotationItem[]
 
   @@map("customer_quotations")
+}
+
+// Envoltura para presentarle al cliente un total combinado de varias
+// cotizaciones suyas (típicamente, varios equipos recibidos a la vez) y
+// que las apruebe/rechace todas de una sola acción — sin fusionar sus
+// datos: cada CustomerQuotation agrupada sigue siendo independiente
+// (su propio número, items, y conversión a orden si aplica). El grupo
+// no tiene su propio estado: se calcula al vuelo a partir del estado de
+// sus cotizaciones (ver QuotationGroupsService.computeStatus), así nunca
+// puede quedar desincronizado si alguien cambia el estado de una
+// cotización por separado.
+model QuotationGroup {
+  id          Int      @id @default(autoincrement())
+  groupNumber String   @unique
+  customerId  Int
+  customer    Customer @relation(fields: [customerId], references: [id])
+  date        DateTime @default(now())
+  notes       String?
+
+  quotations CustomerQuotation[]
+
+  @@map("quotation_groups")
 }
 
 enum QuotationItemType {

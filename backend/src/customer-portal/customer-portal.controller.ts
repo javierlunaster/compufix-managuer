@@ -99,4 +99,37 @@ export class CustomerPortalController {
   ) {
     return this.customerPortalService.rejectMyQuotation(customer.id, quotationId);
   }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Get("my-quotation-groups")
+  findMyQuotationGroups(@CurrentCustomer() customer: AuthenticatedCustomer) {
+    return this.customerPortalService.findMyQuotationGroups(customer.id);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Get("my-quotation-groups/:id")
+  findMyQuotationGroupDetail(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) groupId: number,
+  ) {
+    return this.customerPortalService.findMyQuotationGroupDetail(customer.id, groupId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotation-groups/:id/approve")
+  approveMyQuotationGroup(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) groupId: number,
+  ) {
+    return this.customerPortalService.approveMyQuotationGroup(customer.id, groupId);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Post("my-quotation-groups/:id/reject")
+  rejectMyQuotationGroup(
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+    @Param("id", ParseIntPipe) groupId: number,
+  ) {
+    return this.customerPortalService.rejectMyQuotationGroup(customer.id, groupId);
+  }
 }

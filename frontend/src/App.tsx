@@ -14,6 +14,7 @@ import { PortalOrdersPage } from "@/pages/portal/PortalOrdersPage";
 import { PortalOrderDetailPage } from "@/pages/portal/PortalOrderDetailPage";
 import { PortalQuotationsPage } from "@/pages/portal/PortalQuotationsPage";
 import { PortalQuotationDetailPage } from "@/pages/portal/PortalQuotationDetailPage";
+import { PortalQuotationGroupDetailPage } from "@/pages/portal/PortalQuotationGroupDetailPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { CustomerDetailPage } from "@/pages/CustomerDetailPage";
@@ -25,6 +26,7 @@ import { ProductDetailPage } from "@/pages/ProductDetailPage";
 import { QuotationsPage } from "@/pages/QuotationsPage";
 import { NewQuotationPage } from "@/pages/NewQuotationPage";
 import { QuotationDetailPage } from "@/pages/QuotationDetailPage";
+import { QuotationGroupDetailPage } from "@/pages/QuotationGroupDetailPage";
 import { ServicesPage } from "@/pages/ServicesPage";
 import { CashPage } from "@/pages/CashPage";
 import { CashRegisterDetailPage } from "@/pages/CashRegisterDetailPage";
@@ -133,6 +135,14 @@ function AppRoutes() {
           </PortalProtectedLayout>
         }
       />
+      <Route
+        path="/portal/quotation-groups/:id"
+        element={
+          <PortalProtectedLayout>
+            <PortalQuotationGroupDetailPage />
+          </PortalProtectedLayout>
+        }
+      />
 
       <Route path="/" element={<HomeGate />} />
       <Route path="/finance" element={<ProtectedLayout><FinancePage /></ProtectedLayout>} />
@@ -146,6 +156,7 @@ function AppRoutes() {
       <Route path="/quotations" element={<ProtectedLayout><QuotationsPage /></ProtectedLayout>} />
       <Route path="/quotations/new" element={<ProtectedLayout><NewQuotationPage /></ProtectedLayout>} />
       <Route path="/quotations/:id" element={<ProtectedLayout><QuotationDetailPage /></ProtectedLayout>} />
+      <Route path="/quotation-groups/:id" element={<ProtectedLayout><QuotationGroupDetailPage /></ProtectedLayout>} />
       <Route path="/services" element={<ProtectedLayout><ServicesPage /></ProtectedLayout>} />
       <Route path="/cash" element={<ProtectedLayout><CashPage /></ProtectedLayout>} />
       <Route path="/cash/:id" element={<ProtectedLayout><CashRegisterDetailPage /></ProtectedLayout>} />

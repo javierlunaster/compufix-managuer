@@ -94,6 +94,22 @@ export class DocumentsController {
     });
   }
 
+  @Get("quotation-groups/:groupId/document")
+  @Header("Content-Type", "application/pdf")
+  async quotationGroupPdf(
+    @Param("groupId", ParseIntPipe) groupId: number,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ) {
+    const { buffer, filename } = await this.documentsService.generateQuotationGroupPdf(
+      groupId,
+      actingUser.id,
+    );
+    return new StreamableFile(buffer, {
+      type: "application/pdf",
+      disposition: asAttachment(filename),
+    });
+  }
+
   @Get("sales/:saleId/document")
   @Header("Content-Type", "application/pdf")
   async saleReceipt(

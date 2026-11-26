@@ -512,6 +512,7 @@ export type QuotationListItem = {
   total: string;
   customer: { id: number; fullName: string };
   sourceOrder?: { id: number; orderCode: string } | null;
+  group?: { id: number; groupNumber: string } | null;
 };
 
 export type QuotationDetail = {
@@ -528,8 +529,37 @@ export type QuotationDetail = {
   notes?: string | null;
   customer: { id: number; fullName: string; phone?: string | null };
   sourceOrder?: { id: number; orderCode: string; status: string } | null;
+  group?: { id: number; groupNumber: string } | null;
   items: QuotationItem[];
 };
+
+// Cotización unificada (ver QuotationGroupsService en el backend) — agrupa
+// varias cotizaciones de un mismo cliente (ej. varios equipos recibidos a
+// la vez) bajo un solo total combinado, sin fusionar sus datos: cada
+// miembro conserva su propio número/estado/items. El grupo no tiene su
+// propio estado en la base de datos — `status` y `total` ya vienen
+// calculados por el backend a partir de sus cotizaciones.
+export type QuotationGroupMember = {
+  id: number;
+  quotationNumber: string;
+  status: QuotationStatus;
+  total: string;
+  sourceOrder?: { id: number; orderCode: string; status?: string } | null;
+  items?: QuotationItem[];
+};
+
+export type QuotationGroupListItem = {
+  id: number;
+  groupNumber: string;
+  date: string;
+  notes?: string | null;
+  customer: { id: number; fullName: string; phone?: string | null; email?: string | null };
+  quotations: QuotationGroupMember[];
+  total: number;
+  status: QuotationStatus;
+};
+
+export type QuotationGroupDetail = QuotationGroupListItem;
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Efectivo",
@@ -737,6 +767,30 @@ export type PortalQuotationDetail = PortalQuotationSummary & {
   tax: string;
   shipping: string;
   items: { id: number; description: string; quantity: number; unitPrice: string; subtotal: string }[];
+};
+
+// Cotización unificada vista desde el portal del cliente — equivalente a
+// QuotationGroupListItem/Detail pero con los campos que sí expone
+// customer-portal.service.ts (nunca más de lo que el cliente debe ver).
+export type PortalQuotationGroupSummary = {
+  id: number;
+  groupNumber: string;
+  date: string;
+  total: number;
+  status: QuotationStatus;
+  quotations: { id: number; status: QuotationStatus; total: string }[];
+};
+
+export type PortalQuotationGroupDetail = Omit<PortalQuotationGroupSummary, "quotations"> & {
+  notes?: string | null;
+  quotations: {
+    id: number;
+    quotationNumber: string;
+    status: QuotationStatus;
+    total: string;
+    sourceOrder?: { id: number; orderCode: string } | null;
+    items: { id: number; description: string; quantity: number; unitPrice: string; subtotal: string }[];
+  }[];
 };
 
 export type PortalOrderDetail = Omit<PortalOrderSummary, "quotations"> & {

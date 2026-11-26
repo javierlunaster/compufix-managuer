@@ -11,5 +11,9 @@ import { QuotationsService } from "./quotations.service";
   imports: [RepairPartsModule, RepairServicesModule],
   controllers: [QuotationsController],
   providers: [QuotationsService],
+  // QuotationGroupsModule reutiliza updateStatus() para aprobar/rechazar
+  // cada cotización del grupo una por una, en vez de reimplementar esa
+  // lógica (y su propio audit log) aparte.
+  exports: [QuotationsService],
 })
 export class QuotationsModule {}
