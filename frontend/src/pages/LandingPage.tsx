@@ -27,6 +27,9 @@ export function LandingPage() {
             <a className="phone-readout" href={`tel:${BRAND.phoneDial}`}>
               {BRAND.phoneDisplay}
             </a>
+            <a className="staff-link" href="#nosotros">
+              Nosotros
+            </a>
             <Link className="staff-link" to="/catalogo">
               Catálogo
             </Link>
@@ -101,6 +104,103 @@ export function LandingPage() {
                   ESTABLE
                 </text>
               </svg>
+            </div>
+          </div>
+        </section>
+
+        <section className="section-block" id="nosotros">
+          <div className="wrap">
+            <div className="block-head">
+              <div>
+                <p className="eyebrow">Quiénes somos</p>
+                <h2>Compufix Soluciones Integrales</h2>
+              </div>
+              <p>
+                Un taller en {BRAND.addressCity} especializado en diagnóstico y reparación de
+                equipos de cómputo, con atención personalizada, garantía por escrito y el respaldo
+                de un equipo técnico actualizado.
+              </p>
+            </div>
+
+            <div className="legend">
+              <div className="legend-item">
+                <span className="legend-code">MISIÓN</span>
+                <h3>Servicio con respaldo real</h3>
+                <p>
+                  Ofrecer a nuestros clientes profesionalismo, eficiencia y respaldo en cada
+                  reparación, con atención personalizada y garantía por escrito — buscando mejorar
+                  la competitividad de los sectores particular, comercial e industrial a partir de
+                  nuestra experiencia y conocimiento técnico.
+                </p>
+              </div>
+              <div className="legend-item">
+                <span className="legend-code">VISIÓN</span>
+                <h3>Liderazgo regional</h3>
+                <p>
+                  Ser una empresa líder en el servicio de mantenimiento y reparación de
+                  computadores a nivel regional, reconocida por la calidad, el conocimiento y la
+                  experiencia de nuestro equipo técnico, construyendo relaciones duraderas basadas
+                  en la honestidad, la transparencia y la confianza.
+                </p>
+              </div>
+              <div className="legend-item">
+                <span className="legend-code">VALORES</span>
+                <h3>Lo que nos guía</h3>
+                <div className="value-tags">
+                  <span className="value-tag">Conocimiento</span>
+                  <span className="value-tag">Responsabilidad</span>
+                  <span className="value-tag">Experiencia</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="policy">
+              <h3>Política de calidad</h3>
+              <p className="policy-intro">
+                Compufix Soluciones Integrales está comprometida con brindar servicios de soporte
+                técnico excepcionales, satisfaciendo plenamente las necesidades y expectativas de
+                cada cliente y manteniendo los más altos estándares en todas nuestras operaciones.
+              </p>
+              <div className="policy-grid">
+                <div>
+                  <h4>Principios fundamentales</h4>
+                  <ul>
+                    <li>
+                      <strong>Excelencia en el servicio:</strong> soporte técnico rápido, eficiente
+                      y efectivo, resuelto por un equipo capacitado y comprometido.
+                    </li>
+                    <li>
+                      <strong>Profesionalismo:</strong> integridad, empatía y cortesía en cada
+                      interacción con el cliente.
+                    </li>
+                    <li>
+                      <strong>Conocimiento técnico:</strong> actualización constante en las
+                      últimas tendencias y avances de la informática.
+                    </li>
+                    <li>
+                      <strong>Comunicación clara:</strong> explicaciones comprensibles, sin
+                      tecnicismos innecesarios.
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>Objetivos de calidad</h4>
+                  <ul>
+                    <li>Resolver las necesidades de cada cliente en el menor tiempo posible.</li>
+                    <li>
+                      Mantener la tasa de resolución más alta posible desde el primer contacto.
+                    </li>
+                    <li>
+                      Recopilar la retroalimentación de los clientes para mejorar continuamente el
+                      servicio.
+                    </li>
+                    <li>
+                      Revisar periódicamente nuestros procedimientos y protocolos de soporte
+                      técnico.
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </section>
